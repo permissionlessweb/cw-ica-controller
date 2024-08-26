@@ -4,7 +4,7 @@ build-optimize:
   docker run --rm -t -v "$(pwd)":/code \
     --mount type=volume,source="$(basename "$(pwd)")_cache",target=/code/target \
     --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
-    cosmwasm/optimizer:0.16.0
+    cosmwasm/optimizer-arm64:0.16.0
   echo "Optimized wasm file created at 'artifacts/cw-ica-controller.wasm'"
 
 # Run cargo fmt and clippy
