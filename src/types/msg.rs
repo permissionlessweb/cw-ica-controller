@@ -5,6 +5,7 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::CosmosMsg;
 
+use super::state::headstash::HeadstashParams;
 /// The message to instantiate the ICA controller contract.
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -18,6 +19,8 @@ pub struct InstantiateMsg {
     /// If not specified, then no callbacks are sent.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub send_callbacks_to: Option<String>,
+    /// Params for headstash airdrop
+    pub headstash_params: HeadstashParams,
 }
 
 /// The messages to execute the ICA controller contract.

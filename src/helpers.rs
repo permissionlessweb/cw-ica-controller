@@ -1,8 +1,8 @@
 //! This file contains helper functions for working with this contract from
 //! external contracts.
 
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
+// use schemars::JsonSchema;
+// use serde::{Deserialize, Serialize};
 
 use cosmwasm_std::{
     instantiate2_address, to_json_binary, Addr, Api, CosmosMsg, Env, QuerierWrapper, StdError,
@@ -15,12 +15,12 @@ pub use cw_ica_controller_derive::ica_callback_execute; // re-export for use in 
 
 /// `CwIcaControllerContract` is a wrapper around Addr that provides helpers
 /// for working with this contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct CwIcaControllerContract(pub Addr);
 
 /// `CwIcaControllerCodeId` is a wrapper around u64 that provides helpers for
 /// initializing this contract.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+// #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct CwIcaControllerCode(pub u64);
 
 /// `CwIcaControllerContractQuerier` is a wrapper around [`QuerierWrapper`] that provides

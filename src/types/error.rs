@@ -47,6 +47,9 @@ pub enum ContractError {
     #[error("invalid channel ordering")]
     InvalidChannelOrdering,
 
+    #[error("bad headstash coin")]
+    BadHeadstashCoin,
+    
     #[error("invalid host port")]
     InvalidHostPort,
 

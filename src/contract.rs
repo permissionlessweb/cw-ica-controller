@@ -28,8 +28,11 @@ pub fn instantiate(
         .map(|addr| deps.api.addr_validate(&addr))
         .transpose()?;
 
-    // Save the admin. Ica address is determined during handshake.
-    state::STATE.save(deps.storage, &ContractState::new(callback_address))?;
+    // Save the admin. Ica address is determined during handshake. Save headstash params.
+    state::STATE.save(
+        deps.storage,
+        &ContractState::new(callback_address, msg.headstash_params),
+    )?;
 
     state::CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &msg.channel_open_init_options)?;
 
@@ -356,6 +359,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
     use cosmwasm_std::{Api, StdError, SubMsg};
+    use state::headstash::HeadstashTokenParams;
 
     #[test]
     fn test_instantiate() {
@@ -372,10 +376,22 @@ mod tests {
             channel_ordering: None,
         };
 
+        let mock_headstash_params = state::headstash::HeadstashParams {
+            headstash_code_id: 2,
+            token_params: vec![HeadstashTokenParams {
+                native: "native1".into(),
+                ibc: "ibc/native2".into(),
+            }],
+            headstash: None,
+            snip25_code_id: 1u64,
+            snip25_code_hash: "234567jkhgfdsa".into(),
+        };
+
         let msg = InstantiateMsg {
             owner: None,
             channel_open_init_options: channel_open_init_options.clone(),
             send_callbacks_to: None,
+            headstash_params: mock_headstash_params.clone(),
         };
 
         let res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
@@ -429,6 +445,17 @@ mod tests {
             channel_ordering: None,
         };
 
+        let mock_headstash_params = state::headstash::HeadstashParams {
+            headstash_code_id: 2,
+            token_params: vec![HeadstashTokenParams {
+                native: "native1".into(),
+                ibc: "ibc/native2".into(),
+            }],
+            headstash: None,
+            snip25_code_id: 1u64,
+            snip25_code_hash: "234567jkhgfdsa".into(),
+        };
+
         // Instantiate the contract
         let _res = instantiate(
             deps.as_mut(),
@@ -438,6 +465,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
+                headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -486,6 +514,16 @@ mod tests {
             counterparty_port_id: None,
             channel_ordering: None,
         };
+        let mock_headstash_params = state::headstash::HeadstashParams {
+            headstash_code_id: 2,
+            token_params: vec![HeadstashTokenParams {
+                native: "native1".into(),
+                ibc: "ibc/native2".into(),
+            }],
+            headstash: None,
+            snip25_code_id: 1u64,
+            snip25_code_hash: "234567jkhgfdsa".into(),
+        };
 
         // Instantiate the contract
         let _res = instantiate(
@@ -496,6 +534,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
+                headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -542,6 +581,17 @@ mod tests {
             channel_ordering: None,
         };
 
+        let mock_headstash_params = state::headstash::HeadstashParams {
+            headstash_code_id: 2,
+            token_params: vec![HeadstashTokenParams {
+                native: "native1".into(),
+                ibc: "ibc/native2".into(),
+            }],
+            headstash: None,
+            snip25_code_id: 1u64,
+            snip25_code_hash: "234567jkhgfdsa".into(),
+        };
+
         // Instantiate the contract
         let _res = instantiate(
             deps.as_mut(),
@@ -551,6 +601,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
+                headstash_params: mock_headstash_params,
             },
         )
         .unwrap();

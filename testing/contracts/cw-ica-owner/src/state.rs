@@ -1,5 +1,6 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::Addr;
+use cw_ica_controller::types::state::headstash::HeadstashParams;
 use cw_storage_plus::{Item, Map};
 
 pub use contract::ContractState;
@@ -8,13 +9,17 @@ pub use ica::{IcaContractState, IcaState};
 /// The item used to store the state of the IBC application.
 pub const STATE: Item<ContractState> = Item::new("state");
 /// The map used to store the state of the cw-ica-controller contracts.
-pub const ICA_STATES: Map<u64, IcaContractState> = Map::new("ica_states");
+pub const ICA_STATES: Map<u64, IcaContractState> = Map::new("icas");
+/// The map used to store the state of the cw-ica-controller contracts.
+pub const HEADSTASH_STATES: Map<u64, HeadstashParams> = Map::new("hsp");
 /// The item used to store the count of the cw-ica-controller contracts.
-pub const ICA_COUNT: Item<u64> = Item::new("ica_count");
+pub const ICA_COUNT: Item<u64> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
-pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("contract_addr_to_ica_id");
+pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
 
 mod contract {
+    use cw_ica_controller::types::state::headstash::HeadstashParams;
+
     use crate::ContractError;
 
     use super::*;
@@ -30,7 +35,7 @@ mod contract {
 
     impl ContractState {
         /// Creates a new ContractState.
-        pub fn new(admin: Addr, ica_controller_code_id: u64) -> Self {
+        pub fn new(admin: Addr, ica_controller_code_id: u64,) -> Self {
             Self {
                 admin,
                 ica_controller_code_id,
@@ -58,6 +63,7 @@ mod ica {
     pub struct IcaContractState {
         pub contract_addr: Addr,
         pub ica_state: Option<IcaState>,
+        pub headstash_params: Option<HeadstashParams>
     }
 
     /// IcaState is the state of the ICA.
@@ -75,6 +81,7 @@ mod ica {
             Self {
                 contract_addr,
                 ica_state: None,
+                headstash_params: None,
             }
         }
     }

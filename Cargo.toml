@@ -60,5 +60,11 @@ prost = { version = "0.13", optional = true }
 anybuf = "0.5"
 serde_with = "3.8"
 
+# headstash dependencies
+secret-cosmwasm-std = { package = "cosmwasm-std",git = "https://github.com/scrtlabs/cosmwasm/", default-features = false, tag = "v1.1.9-secret" }
+snip20-reference-impl = { git = "https://github.com/scrtlabs/snip20-reference-impl", rev = "ea9fb0cd76f3e0d48e86b4d02a3990f2f4a84d00" }
+secret_headstash = { git = "https://github.com/permissionlessweb/secret-airdrop", rev = "0a13bb4027c87fb88cc5fdd6d541ed1b7a930d1e" }
+sha2 = { version = "0.10.6", default-features = false }
+
 [dev-dependencies]
 base64 = "0.13.1"

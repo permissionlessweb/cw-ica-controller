@@ -6,4 +6,5 @@
 pub mod contract;
 pub mod helpers;
 pub mod ibc;
+pub mod headstash;
 pub mod types;

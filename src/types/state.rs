@@ -11,7 +11,7 @@ pub use channel::{ChannelState, ChannelStatus};
 #[allow(clippy::module_name_repetitions)]
 pub use contract::State as ContractState;
 
-/// The item used to store the state of the IBC application.
+/// The item used to store the state of the IBC n.
 pub const STATE: Item<ContractState> = Item::new("state");
 
 /// The item used to store the state of the IBC application's channel.
@@ -46,7 +46,7 @@ mod contract {
 
     use cosmwasm_schema::schemars::JsonSchema;
 
-    use super::{cw_serde, Addr, ContractError};
+    use super::{cw_serde, headstash::HeadstashParams, Addr, ContractError};
 
     /// State is the state of the contract.
     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -59,16 +59,22 @@ mod contract {
         /// The address of the callback contract.
         #[serde(default)]
         pub callback_address: Option<Addr>,
+        /// The code ID of the snip25 code, on Secret Network.
+        pub headstash_params: HeadstashParams,
     }
 
     impl State {
         /// Creates a new [`State`]
         #[must_use]
-        pub const fn new(callback_address: Option<Addr>) -> Self {
+        pub const fn new(
+            callback_address: Option<Addr>,
+            headstash_params: HeadstashParams,
+        ) -> Self {
             Self {
                 ica_info: None,
                 // We always allow the first `MsgChannelOpenInit` message.
                 callback_address,
+                headstash_params,
             }
         }
 
@@ -96,6 +102,11 @@ mod contract {
         /// Deletes the ICA info
         pub fn delete_ica_info(&mut self) {
             self.ica_info = None;
+        }
+
+        /// Get the params for the headstash instance
+        pub fn get_headstash_info(self) -> HeadstashParams {
+            self.headstash_params
         }
     }
 
@@ -227,4 +238,59 @@ pub mod ica_query {
         /// Whether the query was [`cosmwasm_std::QueryRequest::Stargate`] or not.
         pub is_stargate: bool,
     }
+}
+/// Headstash specific types
+pub mod headstash {
+
+    use crate::types::ContractError;
+
+    use super::{cw_serde, STATE};
+    use cosmwasm_std::{Coin, DepsMut};
+
+    /// Params for Headstash Tokens
+    #[cw_serde]
+    pub struct HeadstashTokenParams {
+        /// native token name
+        pub native: String,
+        /// ibc string on Secret
+        pub ibc: String,
+    }
+    /// Params for Headstash
+    #[cw_serde]
+    pub struct HeadstashParams {
+        /// The code ID of the snip25 contract, on Secret Network.
+        pub snip25_code_id: u64,
+        /// The code hash of the snip25 contract, on Secret Network.
+        pub snip25_code_hash: String,
+        /// Code id of Headstash contract on Secret Network
+        pub headstash_code_id: u64,
+        /// Params defined by deployer for tokens included
+        pub token_params: Vec<HeadstashTokenParams>,
+        /// Headstash contract address this contract is admin of.
+        /// We save this address in the first callback msg sent during setup_headstash,
+        /// and then use it to set as admin for snip25 of assets after 1st callback.
+        pub headstash: Option<String>,
+    }
+
+    impl HeadstashTokenParams {
+        /// loads token params for a given coin.
+        pub fn from_coin(deps: DepsMut, coin: Coin) -> Result<Self, ContractError> {
+            let param = STATE.load(deps.storage).unwrap().headstash_params;
+            let token_param = param
+                .token_params
+                .iter()
+                .find(|tp| tp.native == coin.denom || tp.ibc == coin.denom);
+            match token_param {
+                Some(tp) => {
+                    // Create your struct using tp
+                    Ok(tp.clone())
+                }
+                None => {
+                    return Err(ContractError::BadHeadstashCoin);
+                }
+            }
+        }
+    }
+
+    impl HeadstashParams {}
 }
