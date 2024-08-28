@@ -16,9 +16,10 @@ pub const HEADSTASH_STATES: Map<u64, HeadstashParams> = Map::new("hsp");
 pub const ICA_COUNT: Item<u64> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
 pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
+/// The item used to store the stat of the snip25 contracts created
+pub const SNIP25_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
 
 mod contract {
-    use cw_ica_controller::types::state::headstash::HeadstashParams;
 
     use crate::ContractError;
 
@@ -35,7 +36,7 @@ mod contract {
 
     impl ContractState {
         /// Creates a new ContractState.
-        pub fn new(admin: Addr, ica_controller_code_id: u64,) -> Self {
+        pub fn new(admin: Addr, ica_controller_code_id: u64) -> Self {
             Self {
                 admin,
                 ica_controller_code_id,
@@ -63,7 +64,7 @@ mod ica {
     pub struct IcaContractState {
         pub contract_addr: Addr,
         pub ica_state: Option<IcaState>,
-        pub headstash_params: Option<HeadstashParams>
+        pub headstash_params: Option<HeadstashParams>,
     }
 
     /// IcaState is the state of the ICA.

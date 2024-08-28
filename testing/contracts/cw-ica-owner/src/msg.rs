@@ -1,8 +1,18 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cw_ica_controller::helpers::ica_callback_execute;
-use cw_ica_controller::types::msg::options::ChannelOpenInitOptions;
-use cw_ica_controller::types::state::headstash::HeadstashParams;
+use cw_ica_controller::{
+    helpers::ica_callback_execute,
+    types::{
+        msg::options::ChannelOpenInitOptions,
+        state::headstash::{HeadstashParams, HeadstashTokenParams},
+    },
+};
+use secret_headstash::state::Headstash;
 
+#[cw_serde]
+pub struct Snip25InitParams {
+    pub ibc_hash: String,
+    pub native: String,
+}
 #[cw_serde]
 pub struct InstantiateMsg {
     pub admin: Option<String>,
@@ -18,16 +28,12 @@ pub enum ExecuteMsg {
         channel_open_init_options: ChannelOpenInitOptions,
         headstash_params: HeadstashParams,
     },
-    /// SendPredefinedAction sends a predefined action from the ICA controller to the ICA host.
-    /// This demonstration is useful for contracts that have predefined actions such as DAOs.
-    ///
-    /// In this example, the predefined action is a `MsgSend` message which sends 100 "stake" tokens.
+    /// 1. Upload the headstash contract code
     UploadHeadstash {
         /// The ICA ID.
         ica_id: u64,
-        /// The recipient's address, on the counterparty chain, to send the tokens to from ICA host.
-        to_address: String,
     },
+    /// 2. Instantiates the secret headstash contract on Secret Network.
     InstantiateHeadstash {
         /// The ICA ID.
         ica_id: u64,
@@ -36,10 +42,21 @@ pub enum ExecuteMsg {
         /// Total token supply for each involved asset. Will be depreciated for more granular control with
         total: headstash_cosmwasm_std::Uint128,
     },
-    InstantiateTerpNetworkSNIP25 {
+    /// 3. Instantiate a snip25 contract for every token defined in tokens.
+    InstantiateTerpNetworkSnip25 {
         /// The ICA ID.
         ica_id: u64,
+        /// Tokens to have their snip25 contract created
+        tokens: Vec<HeadstashTokenParams>,
     },
+    /// 4. Authorized the headstash contract as a minter for both snip25 contracts.
+    AuthorizeMinter { ica_id: u64 },
+    /// 5. Transfer each token included in msg over via ics20.
+    IBCTransferTokens { ica_id: u64, channel_id: String },
+    /// 6. Add Eligible Addresses To Headstash
+    AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
+    /// 7. Authorize
+    AuthorizeFeegrant { ica_id: u64, to_grant: Vec<String> },
 }
 
 #[cw_serde]

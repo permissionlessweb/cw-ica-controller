@@ -4,13 +4,22 @@ use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 // use cw2::set_contract_version;
-
-use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{ContractState, STATE};
-use cw_ica_controller::{
-    helpers::CwIcaControllerContract, types::msg::ExecuteMsg as IcaControllerExecuteMsg,
+use crate::{
+    error::ContractError,
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
+    state::{self, ContractState, CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT, ICA_STATES, STATE},
 };
+use cw_ica_controller::{
+    headstash::commands::*,
+    helpers::{CwIcaControllerCode, CwIcaControllerContract},
+    types::{
+        callbacks::IcaControllerCallbackMsg,
+        msg::{options::ChannelOpenInitOptions, ExecuteMsg as IcaControllerExecuteMsg},
+        state::headstash::HeadstashTokenParams,
+        state::{headstash::HeadstashParams, ChannelState, ChannelStatus},
+    },
+};
+use headstash_cosmwasm_std::Uint128;
 
 /*
 // version info for migration info
@@ -58,11 +67,11 @@ pub fn execute(
             channel_open_init_options,
             headstash_params,
         ),
-        ExecuteMsg::UploadHeadstash { ica_id, to_address } => {
-            execute::ica_upload_headstash_on_secret(deps, info, ica_id, to_address)
+        ExecuteMsg::UploadHeadstash { ica_id } => {
+            execute::ica_upload_headstash_on_secret(deps, info, ica_id)
         }
         ExecuteMsg::ReceiveIcaCallback(callback_msg) => {
-            execute::ica_callback_handler(deps, info, callback_msg)
+            ica::ica_callback_handler(deps, info, callback_msg)
         }
         ExecuteMsg::InstantiateHeadstash {
             ica_id,
@@ -71,8 +80,20 @@ pub fn execute(
         } => {
             execute::ica_instantiate_headstash_contract(deps, env, info, ica_id, start_date, total)
         }
-        ExecuteMsg::InstantiateTerpNetworkSNIP25 { ica_id } => {
-            execute::ica_instantiate_terp_network_snip25s(deps, info, ica_id)
+        ExecuteMsg::InstantiateTerpNetworkSnip25 { ica_id, tokens } => {
+            execute::ica_instantiate_terp_network_snip25s(deps, info, ica_id, tokens)
+        }
+        ExecuteMsg::AuthorizeMinter { ica_id } => {
+            execute::ica_authorize_snip25_minter(deps, info, ica_id)
+        }
+        ExecuteMsg::IBCTransferTokens { ica_id, channel_id } => {
+            execute::ibc_transfer_to_snip_contracts(deps, env, info, ica_id, channel_id)
+        }
+        ExecuteMsg::AddHeadstashClaimers { ica_id, to_add } => {
+            execute::ica_add_headstash_claimers(deps, info, ica_id, to_add)
+        }
+        ExecuteMsg::AuthorizeFeegrant { ica_id, to_grant } => {
+            execute::ica_authorize_feegrant(deps, info, ica_id, to_grant)
         }
     }
 }
@@ -89,17 +110,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 mod execute {
-    use cosmwasm_std::ContractInfo;
-    use cw_ica_controller::types::callbacks::IcaControllerCallbackMsg;
-    use cw_ica_controller::types::msg::ExecuteMsg as IcaControllerExecuteMsg;
-    use cw_ica_controller::types::state::headstash::HeadstashParams;
-    use cw_ica_controller::types::state::{ChannelState, ChannelStatus};
-    use cw_ica_controller::{
-        helpers::CwIcaControllerCode, types::msg::options::ChannelOpenInitOptions,
-    };
-    use headstash_cosmwasm_std::Uint128;
 
-    use crate::state::{self, CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT, ICA_STATES};
+    use secret_headstash::state::Headstash;
+    use state::SNIP25_CONTRACTS;
 
     use super::*;
 
@@ -151,21 +164,18 @@ mod execute {
         Ok(Response::new().add_message(cosmos_msg))
     }
 
-    use cw_ica_controller::headstash::commands::*;
-
-    // 1. upload secret network binary 
     pub fn ica_upload_headstash_on_secret(
         deps: DepsMut,
         info: MessageInfo,
         ica_id: u64,
-        _to_address: String,
     ) -> Result<Response, ContractError> {
         let cw_ica_contract =
             helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
-       
+
         let upload_msg = upload_headstash_contract_msg(info.sender);
         let msg = helpers::send_msg_as_ica(vec![upload_msg], cw_ica_contract);
 
+        // TODO: save code_id of headstash on Secret Network to state on ica-callback.
         Ok(Response::default().add_message(msg))
     }
 
@@ -186,38 +196,76 @@ mod execute {
         )?;
 
         if let Some(hs) = ica_state.headstash_params {
-            let init_headstash_msg = instantiate_headstash_contract_msg(
-                hs.headstash_code_id,
-                secret_headstash::msg::InstantiateMsg {
-                    admin: None, // depreciated. info.sender is always admin.
-                    claim_msg_plaintext: "{wallet}".into(),
-                    end_date: Some(env.block.time.plus_days(365u64).nanos()),
-                    snip20_1: headstash_cosmwasm_std::ContractInfo {
-                        address: headstash_cosmwasm_std::Addr::unchecked(
-                            hs.token_params[0].native.clone(),
-                        ),
-                        code_hash: "code-hash-1".into(),
+            if let Some(ica) = ica_state.ica_state {
+                let init_headstash_msg = instantiate_headstash_contract_msg(
+                    hs.headstash_code_id,
+                    secret_headstash::msg::InstantiateMsg {
+                        claim_msg_plaintext: "{wallet}".into(),
+                        end_date: Some(env.block.time.plus_days(365u64).nanos()),
+                        snip20_1: headstash_cosmwasm_std::ContractInfo {
+                            address: headstash_cosmwasm_std::Addr::unchecked(
+                                hs.token_params[0].native.clone(),
+                            ),
+                            code_hash: hs.snip25_code_hash.clone(),
+                        },
+                        snip20_2: Some(headstash_cosmwasm_std::ContractInfo {
+                            address: headstash_cosmwasm_std::Addr::unchecked(
+                                hs.token_params[1].native.clone(),
+                            ),
+                            code_hash: hs.snip25_code_hash.clone(),
+                        }),
+                        start_date: Some(start_date),
+                        total_amount,
+                        viewing_key: "eretskeretjablret".into(),
+                        admin: headstash_cosmwasm_std::Addr::unchecked(ica.ica_addr),
                     },
-                    snip20_2: Some(headstash_cosmwasm_std::ContractInfo {
-                        address: headstash_cosmwasm_std::Addr::unchecked(
-                            hs.token_params[1].native.clone(),
-                        ),
-                        code_hash: "code-hash-2".into(),
-                    }),
-                    start_date: Some(start_date),
-                    total_amount,
-                    viewing_key: "eretskeretjablret".into(),
-                },
-            )?;
-            let msg = helpers::send_msg_as_ica(vec![init_headstash_msg], cw_ica_contract);
-            msgs.push(msg)
+                )?;
+                let msg = helpers::send_msg_as_ica(vec![init_headstash_msg], cw_ica_contract);
+                msgs.push(msg)
+            } else {
+                return Err(ContractError::NoIcaInfo {});
+            }
+        } else {
+            return Err(ContractError::NoHeadstashInfo {});
         }
-
+        // TODO: save headstash address created to state on message callback
         Ok(Response::new().add_messages(msgs))
     }
 
     /// Creates a snip25 msg for ica-controller to send.
     pub fn ica_instantiate_terp_network_snip25s(
+        deps: DepsMut,
+        info: MessageInfo,
+        ica_id: u64,
+        tokens: Vec<HeadstashTokenParams>,
+    ) -> Result<Response, ContractError> {
+        let mut msgs = vec![];
+        let cw_ica_contract =
+            helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
+
+        let state = ICA_STATES.load(deps.storage, ica_id)?;
+        let hp = state.headstash_params.unwrap();
+
+        // we expect first coin in map to be scrtTERP,
+        // second coin to be scrtTHIOL.
+        for token in tokens.clone() {
+            if let Some(t) = hp.token_params.iter().find(|t| t.native == token.native) {
+                let msg = self::ica::form_instantiate_snip25(
+                    cw_ica_contract.addr().to_string(),
+                    token,
+                    hp.snip25_code_hash.clone(),
+                    hp.snip25_code_id,
+                    hp.headstash.clone(),
+                    t.symbol.clone(),
+                )?;
+                msgs.push(msg);
+            }
+        }
+        // TODO: save SNIP25 addrs created to state on callback.
+        Ok(Response::new().add_messages(msgs))
+    }
+
+    pub fn ica_authorize_snip25_minter(
         deps: DepsMut,
         info: MessageInfo,
         ica_id: u64,
@@ -228,22 +276,121 @@ mod execute {
 
         let state = ICA_STATES.load(deps.storage, ica_id)?;
         let hp = state.headstash_params.unwrap();
-        for coin in info.funds.clone() {
-            let msg = form_instantiate_snip25(
-                cw_ica_contract.addr().to_string(),
-                secret_cosmwasm_std::Coin {
-                    denom: coin.denom,
-                    amount: secret_cosmwasm_std::Uint128::from(coin.amount.u128()),
-                },
-                hp.snip25_code_hash.clone(),
-                hp.snip25_code_id,
-                hp.headstash.clone(),
-            )?;
-            msgs.push(msg);
+
+        if let Some(ica) = state.ica_state.clone() {
+            let hs_addr = hp.headstash.unwrap();
+            // load snip25's from state
+            let snip25 = SNIP25_CONTRACTS.load(deps.storage)?;
+            for snip in snip25 {
+                // add minter msg
+                let msg = ica::form_authorize_minter(
+                    ica.ica_addr.clone(),
+                    hs_addr.clone(),
+                    snip.to_string(),
+                )?;
+                msgs.push(msg);
+            }
+        }
+        // push msgs for ica to run
+        let ica_msg = helpers::send_msg_as_ica(msgs, cw_ica_contract);
+        Ok(Response::new().add_message(ica_msg))
+    }
+
+    pub fn ibc_transfer_to_snip_contracts(
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        ica_id: u64,
+        channel_id: String,
+    ) -> Result<Response, ContractError> {
+        let mut msgs = vec![];
+        let state = ICA_STATES.load(deps.storage, ica_id)?;
+
+        if let Some(hp) = state.headstash_params {
+            for coin in info.funds {
+                if let Some(token) = hp.token_params.iter().find(|t| t.native == coin.denom) {
+                    if let Some(snip) = token.snip_addr.clone() {
+                        let msg = ica::form_ibc_transfer_msg(
+                            env.block.time,
+                            600u64,
+                            snip,
+                            channel_id.clone(),
+                            coin,
+                        )?;
+                        // add minter msg
+                        msgs.push(msg);
+                    } else {
+                        return Err(ContractError::SnipTokenNotSet {});
+                    }
+                }
+            }
+        } else {
+            return Err(ContractError::NoHeadstashInfo {});
         }
         Ok(Response::new().add_messages(msgs))
     }
 
+    pub fn ica_add_headstash_claimers(
+        deps: DepsMut,
+        info: MessageInfo,
+        ica_id: u64,
+        to_add: Vec<Headstash>,
+    ) -> Result<Response, ContractError> {
+        let mut msgs = vec![];
+        let cw_ica_contract =
+            helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
+
+        let state = ICA_STATES.load(deps.storage, ica_id)?;
+        let hp = state.headstash_params.unwrap();
+
+        if let Some(ica) = state.ica_state.clone() {
+            let hs_addr = hp.headstash.unwrap();
+            // add headstash claimers msg
+            let msg = ica::form_add_headstash(ica.ica_addr.clone(), hs_addr.clone(), to_add)?;
+            msgs.push(msg);
+        } else {
+            return Err(ContractError::IcaInfoNotSet {});
+        }
+        // push msgs for ica to run
+        let ica_msg = helpers::send_msg_as_ica(msgs, cw_ica_contract);
+        Ok(Response::new().add_message(ica_msg))
+    }
+
+    pub fn ica_authorize_feegrant(
+        deps: DepsMut,
+        info: MessageInfo,
+        ica_id: u64,
+        to_grant: Vec<String>,
+    ) -> Result<Response, ContractError> {
+        let mut msgs = vec![];
+        let cw_ica_contract =
+            helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
+
+        let state = ICA_STATES.load(deps.storage, ica_id)?;
+        let hp = state.headstash_params.unwrap();
+
+        if let Some(ica) = state.ica_state.clone() {
+            // add headstash claimers msg
+            for addr in to_grant {
+                let msg = ica::form_authorize_feegrant(ica.ica_addr.clone(), addr)?;
+                msgs.push(msg);
+            }
+        } else {
+            return Err(ContractError::IcaInfoNotSet {});
+        }
+        // push msgs for ica to run
+        let ica_msg = helpers::send_msg_as_ica(msgs, cw_ica_contract);
+        Ok(Response::new().add_message(ica_msg))
+    }
+}
+
+mod ica {
+    use anybuf::Anybuf;
+    use cosmwasm_std::{Coin, IbcTimeout, Timestamp};
+    use cw_ica_controller::types::state::headstash::HeadstashTokenParams;
+    use secret_headstash::state::Headstash;
+
+    use super::*;
     /// Handles ICA controller callback messages.
     pub fn ica_callback_handler(
         deps: DepsMut,
@@ -253,25 +400,33 @@ mod execute {
         let ica_id = CONTRACT_ADDR_TO_ICA_ID.load(deps.storage, info.sender)?;
         let mut ica_state = ICA_STATES.load(deps.storage, ica_id)?;
 
-        if let IcaControllerCallbackMsg::OnChannelOpenAckCallback {
-            channel,
-            ica_address,
-            tx_encoding,
-        } = callback_msg
-        {
-            ica_state.ica_state = Some(state::IcaState {
-                ica_id,
-                channel_state: ChannelState {
-                    channel,
-                    channel_status: ChannelStatus::Open,
-                },
-                ica_addr: ica_address,
+        match callback_msg {
+            IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
+                ica_acknowledgement,
+                original_packet,
+                relayer,
+            } => todo!(),
+            IcaControllerCallbackMsg::OnTimeoutPacketCallback {
+                original_packet,
+                relayer,
+            } => todo!(),
+            IcaControllerCallbackMsg::OnChannelOpenAckCallback {
+                channel,
+                ica_address,
                 tx_encoding,
-            });
-
-            // 2. Instantiate Headstash contract as
-            ICA_STATES.save(deps.storage, ica_id, &ica_state)?;
-        }
+            } => {
+                ica_state.ica_state = Some(crate::state::IcaState {
+                    ica_id,
+                    channel_state: ChannelState {
+                        channel,
+                        channel_status: ChannelStatus::Open,
+                    },
+                    ica_addr: ica_address,
+                    tx_encoding,
+                });
+                ICA_STATES.save(deps.storage, ica_id, &ica_state)?;
+            }
+        };
 
         Ok(Response::default())
     }
@@ -279,21 +434,16 @@ mod execute {
     /// Instantiates a snip25 token on Secret Network via Stargate
     pub fn form_instantiate_snip25(
         sender: String,
-        coin: secret_cosmwasm_std::Coin,
+        coin: HeadstashTokenParams,
         code_hash: String,
         code_id: u64,
         headstash: Option<String>,
+        symbol: String,
     ) -> Result<CosmosMsg, ContractError> {
-        let symbol = match coin.denom.as_str() {
-            "ibc1" => "scrtTERP",
-            "ibc2" => "scrtTHIOL",
-            _ => return Err(ContractError::Unauthorized {}),
-        };
-
         let init_msg = snip20_reference_impl::msg::InstantiateMsg {
-            name: "Terp Network snip25 - ".to_owned() + coin.denom.as_str(),
+            name: "Terp Network SNIP25 - ".to_owned() + coin.name.as_str(),
             admin: headstash,
-            symbol: symbol.to_string(),
+            symbol,
             decimals: 6u8,
             initial_balances: None,
             prng_seed: secret_cosmwasm_std::Binary(
@@ -302,7 +452,7 @@ mod execute {
                     .into_bytes(),
             ),
             config: None,
-            supported_denoms: Some(vec![coin.denom.clone()]),
+            supported_denoms: Some(vec![coin.ibc.clone()]),
         };
         Ok(
             #[allow(deprecated)]
@@ -314,7 +464,7 @@ mod execute {
                     .append_uint64(3, code_id) // code-id of snip-25
                     .append_string(
                         4,
-                        "SNIP25 For Secret Network - ".to_owned() + coin.denom.as_str(),
+                        "SNIP25 For Secret Network - ".to_owned() + coin.name.as_str(),
                     ) // label of snip20
                     .append_bytes(5, to_json_binary(&init_msg)?.as_slice())
                     .append_string(8, &code_hash.to_string()) // callback_code_hash
@@ -323,8 +473,82 @@ mod execute {
             },
         )
     }
-}
+    pub fn form_authorize_minter(
+        sender: String,
+        headstash: String,
+        snip25: String,
+    ) -> Result<CosmosMsg, ContractError> {
+        let set_minter_msg = snip20_reference_impl::msg::ExecuteMsg::AddMinters {
+            minters: vec![headstash.clone()],
+            padding: None,
+        };
+        Ok(
+            #[allow(deprecated)]
+            CosmosMsg::Stargate {
+                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                value: anybuf::Anybuf::new()
+                    .append_string(1, sender.to_string()) // sender (DAO)
+                    .append_string(2, &snip25.to_string()) // contract
+                    .append_bytes(3, to_json_binary(&set_minter_msg)?.as_slice())
+                    .into_vec()
+                    .into(),
+            },
+        )
+    }
+    pub fn form_ibc_transfer_msg(
+        time: Timestamp,
+        seconds: u64,
+        snip25: String,
+        channel_id: String,
+        coin: Coin,
+    ) -> Result<CosmosMsg, ContractError> {
+        Ok(CosmosMsg::Ibc(cosmwasm_std::IbcMsg::Transfer {
+            channel_id,
+            to_address: snip25,
+            amount: coin,
+            timeout: IbcTimeout::with_timestamp(time.plus_seconds(seconds)),
+            memo: None,
+        }))
+    }
 
+    pub fn form_add_headstash(
+        sender: String,
+        headstash: String,
+        to_add: Vec<Headstash>,
+    ) -> Result<CosmosMsg, ContractError> {
+        let msg = secret_headstash::msg::ExecuteMsg::Add { headstash: to_add };
+        Ok(
+            #[allow(deprecated)]
+            CosmosMsg::Stargate {
+                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                value: anybuf::Anybuf::new()
+                    .append_string(1, sender.to_string()) // sender (DAO)
+                    .append_string(2, &headstash.to_string()) // contract
+                    .append_bytes(3, to_json_binary(&msg)?.as_slice())
+                    .into_vec()
+                    .into(),
+            },
+        )
+    }
+
+    pub fn form_authorize_feegrant(
+        sender: String,
+        grantee: String,
+    ) -> Result<CosmosMsg, ContractError> {
+        Ok(
+            #[allow(deprecated)]
+            CosmosMsg::Stargate {
+                type_url: "/cosmos.feegrant.v1beta1.MsgGrantAllowance".into(),
+                value: Anybuf::new()
+                    .append_string(1, sender.to_string()) // granter (DAO)
+                    .append_string(2, &grantee.to_string()) // grantee
+                    .append_message(3, &Anybuf::new()) //todo: add allowance
+                    .into_vec()
+                    .into(),
+            },
+        )
+    }
+}
 mod query {
     use crate::state::{IcaContractState, ICA_COUNT, ICA_STATES};
 

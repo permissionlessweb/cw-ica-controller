@@ -378,10 +378,22 @@ mod tests {
 
         let mock_headstash_params = state::headstash::HeadstashParams {
             headstash_code_id: 2,
-            token_params: vec![HeadstashTokenParams {
-                native: "native1".into(),
-                ibc: "ibc/native2".into(),
-            }],
+            token_params: vec![
+                HeadstashTokenParams {
+                    native: "native1".into(),
+                    ibc: "ibc/native1".into(),
+                    symbol: "scrtNATIVE1".into(),
+                    name: "name-of-native1".into(),
+                    snip_addr: None,
+                },
+                HeadstashTokenParams {
+                    native: "native2".into(),
+                    ibc: "ibc/native2".into(),
+                    symbol: "scrtNATIVE2".into(),
+                    name: "name-of-native2".into(),
+                    snip_addr: None,
+                },
+            ],
             headstash: None,
             snip25_code_id: 1u64,
             snip25_code_hash: "234567jkhgfdsa".into(),
@@ -447,10 +459,22 @@ mod tests {
 
         let mock_headstash_params = state::headstash::HeadstashParams {
             headstash_code_id: 2,
-            token_params: vec![HeadstashTokenParams {
-                native: "native1".into(),
-                ibc: "ibc/native2".into(),
-            }],
+            token_params: vec![
+                HeadstashTokenParams {
+                    native: "native1".into(),
+                    ibc: "ibc/native1".into(),
+                    symbol: "scrtNATIVE1".into(),
+                    name: "name-of-native1".into(),
+                    snip_addr: None,
+                },
+                HeadstashTokenParams {
+                    native: "native2".into(),
+                    ibc: "ibc/native2".into(),
+                    symbol: "scrtNATIVE2".into(),
+                    name: "name-of-native2".into(),
+                    snip_addr: None,
+                },
+            ],
             headstash: None,
             snip25_code_id: 1u64,
             snip25_code_hash: "234567jkhgfdsa".into(),
@@ -516,10 +540,22 @@ mod tests {
         };
         let mock_headstash_params = state::headstash::HeadstashParams {
             headstash_code_id: 2,
-            token_params: vec![HeadstashTokenParams {
-                native: "native1".into(),
-                ibc: "ibc/native2".into(),
-            }],
+            token_params: vec![
+                HeadstashTokenParams {
+                    native: "native1".into(),
+                    ibc: "ibc/native1".into(),
+                    symbol: "scrtNATIVE1".into(),
+                    name: "name-of-native1".into(),
+                    snip_addr: None,
+                },
+                HeadstashTokenParams {
+                    native: "native2".into(),
+                    ibc: "ibc/native2".into(),
+                    symbol: "scrtNATIVE2".into(),
+                    name: "name-of-native2".into(),
+                    snip_addr: None,
+                },
+            ],
             headstash: None,
             snip25_code_id: 1u64,
             snip25_code_hash: "234567jkhgfdsa".into(),
@@ -583,10 +619,22 @@ mod tests {
 
         let mock_headstash_params = state::headstash::HeadstashParams {
             headstash_code_id: 2,
-            token_params: vec![HeadstashTokenParams {
-                native: "native1".into(),
-                ibc: "ibc/native2".into(),
-            }],
+            token_params: vec![
+                HeadstashTokenParams {
+                    native: "native1".into(),
+                    ibc: "ibc/native1".into(),
+                    symbol: "scrtNATIVE1".into(),
+                    name: "name-of-native1".into(),
+                    snip_addr: None,
+                },
+                HeadstashTokenParams {
+                    native: "native2".into(),
+                    ibc: "ibc/native2".into(),
+                    symbol: "scrtNATIVE2".into(),
+                    name: "name-of-native2".into(),
+                    snip_addr: None,
+                },
+            ],
             headstash: None,
             snip25_code_id: 1u64,
             snip25_code_hash: "234567jkhgfdsa".into(),

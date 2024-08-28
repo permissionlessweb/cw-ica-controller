@@ -15,7 +15,13 @@ pub enum ContractError {
 
     #[error("unauthorized")]
     Unauthorized {},
+    #[error("snip token not set")]
+    SnipTokenNotSet {},
 
     #[error("ica information is not set")]
     IcaInfoNotSet {},
+    #[error("ica information is not set, headstash")]
+    NoIcaInfo {},
+    #[error("headstash information is not set")]
+    NoHeadstashInfo {},
 }

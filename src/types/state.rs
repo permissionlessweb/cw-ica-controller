@@ -250,10 +250,16 @@ pub mod headstash {
     /// Params for Headstash Tokens
     #[cw_serde]
     pub struct HeadstashTokenParams {
+        /// Name to use in snip25 state
+        pub name: String,
+        /// Symbol to use
+        pub symbol: String,
         /// native token name
         pub native: String,
         /// ibc string on Secret
         pub ibc: String,
+        /// snip20 addr on Secret
+        pub snip_addr: Option<String>,
     }
     /// Params for Headstash
     #[cw_serde]
