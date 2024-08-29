@@ -21,34 +21,20 @@ pub const SNIP25_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
 
 mod contract {
 
-    use crate::ContractError;
-
     use super::*;
 
     /// ContractState is the state of the IBC application.
     #[cw_serde]
     pub struct ContractState {
-        /// The admin of this contract.
-        pub admin: Addr,
         /// The code ID of the cw-ica-controller contract.
         pub ica_controller_code_id: u64,
     }
 
     impl ContractState {
         /// Creates a new ContractState.
-        pub fn new(admin: Addr, ica_controller_code_id: u64) -> Self {
+        pub fn new(ica_controller_code_id: u64) -> Self {
             Self {
-                admin,
                 ica_controller_code_id,
-            }
-        }
-
-        /// Checks if the address is the admin
-        pub fn verify_admin(&self, sender: impl Into<String>) -> Result<(), ContractError> {
-            if self.admin.to_string() == sender.into() {
-                Ok(())
-            } else {
-                Err(ContractError::Unauthorized {})
             }
         }
     }
@@ -64,7 +50,7 @@ mod ica {
     pub struct IcaContractState {
         pub contract_addr: Addr,
         pub ica_state: Option<IcaState>,
-        pub headstash_params: Option<HeadstashParams>,
+        pub headstash_params: HeadstashParams,
     }
 
     /// IcaState is the state of the ICA.
@@ -78,11 +64,11 @@ mod ica {
 
     impl IcaContractState {
         /// Creates a new [`IcaContractState`].
-        pub fn new(contract_addr: Addr) -> Self {
+        pub fn new(contract_addr: Addr, headstash_params: HeadstashParams) -> Self {
             Self {
                 contract_addr,
                 ica_state: None,
-                headstash_params: None,
+                headstash_params,
             }
         }
     }

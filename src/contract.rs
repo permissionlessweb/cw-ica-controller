@@ -377,7 +377,7 @@ mod tests {
         };
 
         let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: 2,
+            headstash_code_id: Some(2),
             token_params: vec![
                 HeadstashTokenParams {
                     native: "native1".into(),
@@ -458,7 +458,7 @@ mod tests {
         };
 
         let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: 2,
+            headstash_code_id: Some(2),
             token_params: vec![
                 HeadstashTokenParams {
                     native: "native1".into(),
@@ -539,7 +539,7 @@ mod tests {
             channel_ordering: None,
         };
         let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: 2,
+            headstash_code_id: Some(2),
             token_params: vec![
                 HeadstashTokenParams {
                     native: "native1".into(),
@@ -618,7 +618,7 @@ mod tests {
         };
 
         let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: 2,
+            headstash_code_id: Some(2),
             token_params: vec![
                 HeadstashTokenParams {
                     native: "native1".into(),

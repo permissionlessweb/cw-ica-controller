@@ -674,6 +674,7 @@ dependencies = [
  "cosmwasm-std 1.1.9",
  "cosmwasm-std 2.1.3",
  "cw-ica-controller",
+ "cw-ownable",
  "cw-storage-plus",
  "cw2",
  "schemars",

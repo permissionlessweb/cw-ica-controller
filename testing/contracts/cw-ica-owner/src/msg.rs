@@ -9,18 +9,13 @@ use cw_ica_controller::{
 use secret_headstash::state::Headstash;
 
 #[cw_serde]
-pub struct Snip25InitParams {
-    pub ibc_hash: String,
-    pub native: String,
-}
-#[cw_serde]
 pub struct InstantiateMsg {
-    pub admin: Option<String>,
+    pub owner: Option<String>,
     pub ica_controller_code_id: u64,
-    pub snip25_code_id: u64,
 }
 
 #[ica_callback_execute]
+#[cw_ownable::cw_ownable_execute]
 #[cw_serde]
 pub enum ExecuteMsg {
     CreateIcaContract {
@@ -59,6 +54,7 @@ pub enum ExecuteMsg {
     AuthorizeFeegrant { ica_id: u64, to_grant: Vec<String> },
 }
 
+#[cw_ownable::cw_ownable_query]
 #[cw_serde]
 #[derive(QueryResponses)]
 pub enum QueryMsg {
@@ -71,4 +67,50 @@ pub enum QueryMsg {
     /// GetIcaCount returns the number of ICAs.
     #[returns(u64)]
     GetIcaCount {},
+}
+
+pub struct Snip25InitParams {
+    pub ibc_hash: String,
+    pub native: String,
+}
+
+#[cw_serde]
+pub enum HeadstashCallback {
+    UploadHeadstash,
+    InstantiateHeadstash,
+    InstantiateSnip25s,
+    SetHeadstashAsSnipMinter,
+    AddHeadstashers,
+    AuthorizeFeeGrants,
+    FundHeadstash,
+}
+
+impl From<HeadstashCallback> for String {
+    fn from(callback: HeadstashCallback) -> Self {
+        match callback {
+            HeadstashCallback::UploadHeadstash => "upload_headstash".to_string(),
+            HeadstashCallback::InstantiateHeadstash => "instantiate_headstash".to_string(),
+            HeadstashCallback::InstantiateSnip25s => "instantiate_snip25s".to_string(),
+            HeadstashCallback::SetHeadstashAsSnipMinter => {
+                "set_headstash_as_snip_minter".to_string()
+            }
+            HeadstashCallback::AddHeadstashers => "add_headstashers".to_string(),
+            HeadstashCallback::AuthorizeFeeGrants => "authorize_fee_grants".to_string(),
+            HeadstashCallback::FundHeadstash => "fund_headstash".to_string(),
+        }
+    }
+}
+
+impl From<String> for HeadstashCallback {
+    fn from(s: String) -> Self {
+        match s.as_str() {
+            "upload_headstash" => HeadstashCallback::UploadHeadstash,
+            "instantiate_headstash" => HeadstashCallback::InstantiateHeadstash,
+            "instantiate_snip25s" => HeadstashCallback::InstantiateSnip25s,
+            "set_headstash_as_snip_minter" => HeadstashCallback::SetHeadstashAsSnipMinter,
+            "add_headstashers" => HeadstashCallback::AddHeadstashers,
+            "authorize_fee_grants" => HeadstashCallback::AuthorizeFeeGrants,
+            _ => panic!("Invalid HeadstashCallback value"),
+        }
+    }
 }

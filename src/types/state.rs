@@ -269,13 +269,30 @@ pub mod headstash {
         /// The code hash of the snip25 contract, on Secret Network.
         pub snip25_code_hash: String,
         /// Code id of Headstash contract on Secret Network
-        pub headstash_code_id: u64,
+        pub headstash_code_id: Option<u64>,
         /// Params defined by deployer for tokens included
         pub token_params: Vec<HeadstashTokenParams>,
         /// Headstash contract address this contract is admin of.
         /// We save this address in the first callback msg sent during setup_headstash,
         /// and then use it to set as admin for snip25 of assets after 1st callback.
         pub headstash: Option<String>,
+    }
+
+    impl HeadstashParams {
+        /// creates new headstash param instance
+        pub fn new(
+            snip25_code_id: u64,
+            snip25_code_hash: String,
+            token_params: Vec<HeadstashTokenParams>,
+        ) -> Self {
+            Self {
+                snip25_code_id,
+                snip25_code_hash,
+                headstash_code_id: None,
+                token_params,
+                headstash: None,
+            }
+        }
     }
 
     impl HeadstashTokenParams {
