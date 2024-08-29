@@ -95,7 +95,7 @@ pub fn execute(
         ExecuteMsg::AuthorizeFeegrant { ica_id, to_grant } => {
             execute::ica_authorize_feegrant(deps, info, ica_id, to_grant)
         }
-        ExecuteMsg::UpdateOwnership(_) => todo!(),
+        ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
     }
 }
 
@@ -199,7 +199,15 @@ mod execute {
         )?;
 
         if let Some(ica) = ica_state.ica_state {
+            // headstash must have been uploaded
             if let Some(code_id) = hs.headstash_code_id {
+                // snip
+                // we must have snip contract addrs
+                for snips in hs.token_params.clone() {
+                    if snips.snip_addr.is_none() {
+                        return Err(ContractError::NoSnipContractAddr {});
+                    }
+                }
                 let init_headstash_msg = instantiate_headstash_contract_msg(
                     code_id,
                     secret_headstash::msg::InstantiateMsg {
@@ -207,13 +215,13 @@ mod execute {
                         end_date: Some(env.block.time.plus_days(365u64).nanos()),
                         snip20_1: headstash_cosmwasm_std::ContractInfo {
                             address: headstash_cosmwasm_std::Addr::unchecked(
-                                hs.token_params[0].native.clone(),
+                                hs.token_params[0].snip_addr.clone().unwrap(),
                             ),
                             code_hash: hs.snip25_code_hash.clone(),
                         },
                         snip20_2: Some(headstash_cosmwasm_std::ContractInfo {
                             address: headstash_cosmwasm_std::Addr::unchecked(
-                                hs.token_params[1].native.clone(),
+                                hs.token_params[1].snip_addr.clone().unwrap(),
                             ),
                             code_hash: hs.snip25_code_hash.clone(),
                         }),
@@ -311,9 +319,9 @@ mod execute {
         ica_id: u64,
         channel_id: String,
     ) -> Result<Response, ContractError> {
+        cw_ownable::assert_owner(deps.storage, &info.sender)?;
         let mut msgs = vec![];
         let state = ICA_STATES.load(deps.storage, ica_id)?;
-
         let hp = state.headstash_params;
         for coin in info.funds {
             if let Some(token) = hp.token_params.iter().find(|t| t.native == coin.denom) {
@@ -328,7 +336,7 @@ mod execute {
                     // add minter msg
                     msgs.push(msg);
                 } else {
-                    return Err(ContractError::SnipTokenNotSet {});
+                    return Err(ContractError::NoSnipContractAddr {});
                 }
             } else {
                 return Err(ContractError::NoCoinSentMatchesHeadstashParams {});
@@ -454,20 +462,42 @@ mod ica {
                             }
                             HeadstashCallback::UploadHeadstash => {
                                 // 1. save code-id to state
-                                ica_state.headstash_params.headstash_code_id = Some(69); // todo: grab code-id from response
+                                if let Some(event) =
+                                    response.events.iter().find(|e| e.ty == "store_code")
+                                {
+                                    let checksum = event.attributes[0].value.clone();
+                                    let code_id = event.attributes[1].value.clone();
+                                    ica_state.headstash_params.headstash_code_id =
+                                        Some(u64::from_str_radix(&code_id, 10)?);
+                                    ica_state.headstash_params.snip25_code_hash = checksum;
+                                }
                                 Ok(Response::default())
                             }
                             HeadstashCallback::InstantiateHeadstash => {
-                                // 2. save code-id to state
-                                ica_state.headstash_params.headstash =
-                                    Some("headstash_addr".into()); // todo: grab addr from response
+                                // 2. save headstash addr to state
+                                // (may need to add permissioned query)
+                                if let Some(event) =
+                                    response.events.iter().find(|e| e.ty == "instantiate")
+                                {
+                                    ica_state.headstash_params.headstash =
+                                        Some(event.attributes[0].value.clone());
+                                }
                                 Ok(Response::default())
                             }
                             HeadstashCallback::InstantiateSnip25s => {
+                                let mut count: usize = 0;
                                 // 3. save snips to state
-                                for mut hs_tokens in ica_state.headstash_params.token_params {
-                                    hs_tokens.snip_addr = Some("matched_snip_addr".into());
+                                for event in response
+                                    .events
+                                    .iter()
+                                    .filter(|e| e.ty == "instantiate")
+                                    .collect::<Vec<_>>()
+                                {
+                                    // todo: match the native denom with saved headstash params
+                                    ica_state.headstash_params.token_params[count].snip_addr = Some(event.attributes[count].value.clone());
+                                    count += count;
                                 }
+
                                 Ok(Response::default())
                             }
                             HeadstashCallback::SetHeadstashAsSnipMinter => {

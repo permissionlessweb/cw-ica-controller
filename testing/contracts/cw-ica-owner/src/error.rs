@@ -1,3 +1,5 @@
+use std::num::ParseIntError;
+
 use cosmwasm_std::{Instantiate2AddressError, StdError};
 use thiserror::Error;
 
@@ -26,8 +28,11 @@ pub enum ContractError {
     #[error("headstash information is not set")]
     NoHeadstashInfo {},
 
+    #[error("snip code-id not set")]
+    NoSnipCodeId {},
+    
     #[error("snip token not set")]
-    SnipTokenNotSet {},
+    NoSnipContractAddr {},
 
     #[error("headstash code-id not set.")]
     NoHeadstashCodeId {},
@@ -43,6 +48,9 @@ pub enum ContractError {
 
     #[error("{0}")]
     OwnershipError(#[from] cw_ownable::OwnershipError),
+    
+    #[error("{0}")]
+    ParseIntError(#[from] ParseIntError),
 
     #[error("unauthorized")]
     Unauthorized {},
