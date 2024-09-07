@@ -395,8 +395,9 @@ mod tests {
                 },
             ],
             headstash: None,
-            snip25_code_id: 1u64,
-            snip25_code_hash: "234567jkhgfdsa".into(),
+            snip120u_code_id: 1u64,
+            snip120u_code_hash: "234567jkhgfdsa".into(),
+            feegranter: None,
         };
 
         let msg = InstantiateMsg {
@@ -476,8 +477,9 @@ mod tests {
                 },
             ],
             headstash: None,
-            snip25_code_id: 1u64,
-            snip25_code_hash: "234567jkhgfdsa".into(),
+            snip120u_code_id: 1u64,
+            snip120u_code_hash: "234567jkhgfdsa".into(),
+            feegranter: None,
         };
 
         // Instantiate the contract
@@ -557,8 +559,9 @@ mod tests {
                 },
             ],
             headstash: None,
-            snip25_code_id: 1u64,
-            snip25_code_hash: "234567jkhgfdsa".into(),
+            snip120u_code_id: 1u64,
+            snip120u_code_hash: "234567jkhgfdsa".into(),
+            feegranter: None,
         };
 
         // Instantiate the contract
@@ -636,8 +639,9 @@ mod tests {
                 },
             ],
             headstash: None,
-            snip25_code_id: 1u64,
-            snip25_code_hash: "234567jkhgfdsa".into(),
+            snip120u_code_id: 1u64,
+            snip120u_code_hash: "234567jkhgfdsa".into(),
+            feegranter: None,
         };
 
         // Instantiate the contract

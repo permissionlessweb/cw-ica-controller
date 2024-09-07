@@ -40,6 +40,7 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
+cw-orch                      = "0.24.1"
 cosmwasm-schema = "2.1"
 cosmwasm-std = { version = "2.1", features = [
     "cosmwasm_1_4",

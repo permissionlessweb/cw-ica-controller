@@ -25,12 +25,15 @@ pub enum ContractError {
     #[error("CallbackError")]
     CallbackError {},
 
+    #[error("not a valid feegranter address")]
+    NotValidFeegranter {},
+    
     #[error("headstash information is not set")]
     NoHeadstashInfo {},
 
     #[error("snip code-id not set")]
     NoSnipCodeId {},
-    
+
     #[error("snip token not set")]
     NoSnipContractAddr {},
 
@@ -48,7 +51,7 @@ pub enum ContractError {
 
     #[error("{0}")]
     OwnershipError(#[from] cw_ownable::OwnershipError),
-    
+
     #[error("{0}")]
     ParseIntError(#[from] ParseIntError),
 

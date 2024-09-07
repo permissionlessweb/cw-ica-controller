@@ -16,8 +16,8 @@ pub const HEADSTASH_STATES: Map<u64, HeadstashParams> = Map::new("hsp");
 pub const ICA_COUNT: Item<u64> = Item::new("ica");
 /// The item used to map contract addresses to ICA IDs.
 pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
-/// The item used to store the stat of the snip25 contracts created
-pub const SNIP25_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
+/// The item used to store the stat of the snip120u contracts created
+pub const SNIP120U_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
 
 mod contract {
 
@@ -28,6 +28,7 @@ mod contract {
     pub struct ContractState {
         /// The code ID of the cw-ica-controller contract.
         pub ica_controller_code_id: u64,
+        pub feegranter: Option<String>,
     }
 
     impl ContractState {
@@ -35,6 +36,7 @@ mod contract {
         pub fn new(ica_controller_code_id: u64) -> Self {
             Self {
                 ica_controller_code_id,
+                feegranter: None,
             }
         }
     }

@@ -59,7 +59,7 @@ mod contract {
         /// The address of the callback contract.
         #[serde(default)]
         pub callback_address: Option<Addr>,
-        /// The code ID of the snip25 code, on Secret Network.
+        /// The code ID of the snip120u code, on Secret Network.
         pub headstash_params: HeadstashParams,
     }
 
@@ -250,7 +250,7 @@ pub mod headstash {
     /// Params for Headstash Tokens
     #[cw_serde]
     pub struct HeadstashTokenParams {
-        /// Name to use in snip25 state
+        /// Name to use in snip120u state
         pub name: String,
         /// Symbol to use
         pub symbol: String,
@@ -264,33 +264,36 @@ pub mod headstash {
     /// Params for Headstash
     #[cw_serde]
     pub struct HeadstashParams {
-        /// The code ID of the snip25 contract, on Secret Network.
-        pub snip25_code_id: u64,
-        /// The code hash of the snip25 contract, on Secret Network.
-        pub snip25_code_hash: String,
+        /// The code ID of the snip120u contract, on Secret Network.
+        pub snip120u_code_id: u64,
+        /// The code hash of the snip120u contract, on Secret Network.
+        pub snip120u_code_hash: String,
         /// Code id of Headstash contract on Secret Network
         pub headstash_code_id: Option<u64>,
         /// Params defined by deployer for tokens included
         pub token_params: Vec<HeadstashTokenParams>,
         /// Headstash contract address this contract is admin of.
         /// We save this address in the first callback msg sent during setup_headstash,
-        /// and then use it to set as admin for snip25 of assets after 1st callback.
+        /// and then use it to set as admin for snip120u of assets after 1st callback.
         pub headstash: Option<String>,
+        /// The wallet address able to create feegrant authorizations on behalf of this contract
+        pub feegranter: Option<String>,
     }
 
     impl HeadstashParams {
         /// creates new headstash param instance
         pub fn new(
-            snip25_code_id: u64,
-            snip25_code_hash: String,
+            snip120u_code_id: u64,
+            snip120u_code_hash: String,
             token_params: Vec<HeadstashTokenParams>,
         ) -> Self {
             Self {
-                snip25_code_id,
-                snip25_code_hash,
+                snip120u_code_id,
+                snip120u_code_hash,
                 headstash_code_id: None,
                 token_params,
                 headstash: None,
+                feegranter: None,
             }
         }
     }

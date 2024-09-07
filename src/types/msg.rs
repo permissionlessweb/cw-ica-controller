@@ -24,6 +24,7 @@ pub struct InstantiateMsg {
 }
 
 /// The messages to execute the ICA controller contract.
+#[derive(cw_orch::ExecuteFns)]
 #[cw_ownable::cw_ownable_execute]
 #[serde_with::serde_as]
 #[non_exhaustive]
@@ -77,7 +78,7 @@ pub enum ExecuteMsg {
 #[cw_ownable::cw_ownable_query]
 #[non_exhaustive]
 #[cw_serde]
-#[derive(QueryResponses)]
+#[derive(QueryResponses,cw_orch::QueryFns)]
 pub enum QueryMsg {
     /// GetChannel returns the IBC channel info.
     #[returns(crate::types::state::ChannelState)]

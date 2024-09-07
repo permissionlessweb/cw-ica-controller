@@ -12,6 +12,7 @@ use secret_headstash::state::Headstash;
 pub struct InstantiateMsg {
     pub owner: Option<String>,
     pub ica_controller_code_id: u64,
+    pub feegranter: Option<String>,
 }
 
 #[ica_callback_execute]
@@ -23,10 +24,15 @@ pub enum ExecuteMsg {
         channel_open_init_options: ChannelOpenInitOptions,
         headstash_params: HeadstashParams,
     },
-    /// 1. Upload the headstash contract code
-    UploadHeadstash {
+    /// 1. Upload the following contracts:
+    /// a. Headstash
+    /// b. Snip120u 
+    /// c. Headstash Circuitboard 
+    UploadContractOnSecret {
         /// The ICA ID.
         ica_id: u64,
+        /// The wasm blob name to upload
+        wasm: String,
     },
     /// 2. Instantiates the secret headstash contract on Secret Network.
     InstantiateHeadstash {
@@ -37,21 +43,29 @@ pub enum ExecuteMsg {
         /// Total token supply for each involved asset. Will be depreciated for more granular control with
         total: headstash_cosmwasm_std::Uint128,
     },
-    /// 3. Instantiate a snip25 contract for every token defined in tokens.
-    InstantiateTerpNetworkSnip25 {
+    /// 3. Instantiate a snip120u contract for every token defined in tokens.
+    InstantiateSnip120u {
         /// The ICA ID.
         ica_id: u64,
-        /// Tokens to have their snip25 contract created
+        /// Tokens to have their snip120u contract created
         tokens: Vec<HeadstashTokenParams>,
     },
-    /// 4. Authorized the headstash contract as a minter for both snip25 contracts.
+    /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
     AuthorizeMinter { ica_id: u64 },
-    /// 5. Transfer each token included in msg over via ics20.
+    /// 5. Create Secret Headstash Circuitboard
+    InitScrtIcaOwner { ica_id: u64 },
+    /// 6. Transfer each token included in msg over via ics20.
     IBCTransferTokens { ica_id: u64, channel_id: String },
-    /// 6. Add Eligible Addresses To Headstash
+    /// 7. Create an Terp Network owned ICA account on Secret
+    CreateSecretHeadstashIcaAccount { ica_id: u64 },
+    /// 8. Add Eligible Addresses To Headstash
     AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
-    /// 7. Authorize
-    AuthorizeFeegrant { ica_id: u64, to_grant: Vec<String> },
+    /// 9. Authorize secret network wallet with feegrant
+    AuthorizeFeegrant {
+        ica_id: u64,
+        to_grant: Vec<String>,
+        owner: Option<String>,
+    },
 }
 
 #[cw_ownable::cw_ownable_query]
@@ -69,7 +83,7 @@ pub enum QueryMsg {
     GetIcaCount {},
 }
 
-pub struct Snip25InitParams {
+pub struct SNIP120UInitParams {
     pub ibc_hash: String,
     pub native: String,
 }
@@ -78,7 +92,7 @@ pub struct Snip25InitParams {
 pub enum HeadstashCallback {
     UploadHeadstash,
     InstantiateHeadstash,
-    InstantiateSnip25s,
+    InstantiateSnip120us,
     SetHeadstashAsSnipMinter,
     AddHeadstashers,
     AuthorizeFeeGrants,
@@ -90,7 +104,7 @@ impl From<HeadstashCallback> for String {
         match callback {
             HeadstashCallback::UploadHeadstash => "upload_headstash".to_string(),
             HeadstashCallback::InstantiateHeadstash => "instantiate_headstash".to_string(),
-            HeadstashCallback::InstantiateSnip25s => "instantiate_snip25s".to_string(),
+            HeadstashCallback::InstantiateSnip120us => "instantiate_snip120us".to_string(),
             HeadstashCallback::SetHeadstashAsSnipMinter => {
                 "set_headstash_as_snip_minter".to_string()
             }
@@ -106,7 +120,7 @@ impl From<String> for HeadstashCallback {
         match s.as_str() {
             "upload_headstash" => HeadstashCallback::UploadHeadstash,
             "instantiate_headstash" => HeadstashCallback::InstantiateHeadstash,
-            "instantiate_snip25s" => HeadstashCallback::InstantiateSnip25s,
+            "instantiate_snip120us" => HeadstashCallback::InstantiateSnip120us,
             "set_headstash_as_snip_minter" => HeadstashCallback::SetHeadstashAsSnipMinter,
             "add_headstashers" => HeadstashCallback::AddHeadstashers,
             "authorize_fee_grants" => HeadstashCallback::AuthorizeFeeGrants,
