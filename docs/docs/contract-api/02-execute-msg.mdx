@@ -13,7 +13,7 @@ The `ExecuteMsg` is the message that is used to interact with the `cw-ica-contro
 ## `CreateChannel`
 
 ```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/7773fbd8d4e227b6c942f0c88575f9800809b4bf/src/types/msg.rs#L29-L39
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L27-L37
 ```
 
 This message is used to initiate an ICS-27 channel open handshake. It is only callable by the owner.
@@ -28,7 +28,7 @@ message and save them for future `CreateChannel` messages.
 ## `CloseChannel`
 
 ```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/7773fbd8d4e227b6c942f0c88575f9800809b4bf/src/types/msg.rs#L40-L41
+https://github.com/srdtrk/cw-ica-controller/blob/9890793d3a19a9ec068e26627ec99ec48b3b9d92/src/types/msg.rs#L38-L39
 ```
 
 This message is used to close the ICS-27 channel. It is only callable by the owner.
@@ -38,7 +38,7 @@ original channel open handshake.
 ## `SendCosmosMsgs`
 
 ```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/7773fbd8d4e227b6c942f0c88575f9800809b4bf/src/types/msg.rs#L42-L64
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L38-L52
 ```
 
 Once an ICS-27 channel open handshake is complete, the owner can control the interchain account on the counterparty
@@ -54,62 +54,26 @@ This execution is atomic. If any of the `CosmosMsg`s fail, then the entire execu
 :::note
 
 All applicable `CosmosMsg`s are supported if the channel was opened with `tx_encoding` set to `proto3`.
-The `proto3json` encoding is not supported by this contract anymore.
+However, if the channel was opened with `tx_encoding` set to `proto3json`, then some `CosmosMsg`s are not supported.
+Below is a table of the supported `CosmosMsg`s for each `tx_encoding`.
 
-|                **CosmosMsg**               | **Supported** |
-|:------------------------------------------:|:-------------:|
-|                 `Stargate`                 |       ✅      |
-|               `BankMsg::Send`              |       ✅      |
-|               `BankMsg::Burn`              |       ❌      |
-|             `IbcMsg::Transfer`             |       ✅      |
-|            `IbcMsg::SendPacket`            |      N/A     |
-|           `IbcMsg::CloseChannel`           |      N/A     |
-|                `WasmMsg::*`                |       ✅      |
-|                 `GovMsg::*`                |       ✅      |
-|           `StakingMsg::Delegate`           |       ✅      |
-|               `StakingMsg::*`              |       🟢      |
-| `DistributionMsg::WithdrawDelegatorReward` |       🟢      |
-|            `DistributionMsg::*`            |       ✅      |
+|                **CosmosMsg**               | `proto3` | `proto3json` |
+|:------------------------------------------:|:--------:|:------------:|
+|                 `Stargate`                 |     ✅    |       ❌      |
+|               `BankMsg::Send`              |     ✅    |       ✅      |
+|               `BankMsg::Burn`              |     ❌    |       ❌      |
+|             `IbcMsg::Transfer`             |     ✅    |       🟢      |
+|            `IbcMsg::SendPacket`            |    N/A   |      N/A     |
+|           `IbcMsg::CloseChannel`           |    N/A   |      N/A     |
+|                `WasmMsg::*`                |     ✅    |       ❌      |
+|                 `GovMsg::*`                |     ✅    |       ✅      |
+|           `StakingMsg::Delegate`           |     ✅    |       ✅      |
+|               `StakingMsg::*`              |     🟢    |       🟢      |
+| `DistributionMsg::WithdrawDelegatorReward` |     🟢    |       🟢      |
+|            `DistributionMsg::*`            |     ✅    |       ✅      |
 
 Note that `🟢` means that the `CosmosMsg` is supported but not tested in the contract's test suite.
 These will be tested in the future.
-
-:::
-
-### `queries`
-
-This is a list of `QueryRequest`s that the contract will execute on the counterparty chain using the interchain account.
-
-:::warning
-
-This feature only works if the host (counterparty) chain is on ibc-go v7.5+. If the host chain is on an older version, then the packet will return an error acknowledgement.
-
-:::
-
-:::info
-
-If both `messages` and `queries` are provided, then the `messages` will be executed first. If the `messages` are successful, then the `queries` will be executed. If any of the `queries` fail, then the entire execution will fail.
-
-:::
-
-:::note
-
-In CosmosSDK, query execution is not generally deterministic. This is the main reason why not all query requests are supported. The supported query requests are:
-
-|      **QueryRequest**     | **Supported** |
-|:-------------------------:|:-------------:|
-|        `BankQuery`        |       ✅       |
-|         `Stargate`        |       ✅       |
-|     `WasmQuery::Smart`    |       ✅       |
-|      `WasmQuery::Raw`     |       ✅       |
-| `WasmQuery::ContractInfo` |       ✅       |
-|   `WasmQuery::CodeInfo`   |       ❌       |
-|         `IbcQuery`        |       ❌       |
-|    `DistributionQuery`    |       ❌       |
-
-Note that not all Stargate queries are supported. Only queries which are marked with [`module_query_safe`](https://github.com/cosmos/cosmos-sdk/blob/27a231ae4816fd8c3ee39a1cc02eccf977fb1b79/proto/cosmos/query/v1/query.proto#L36) tag are supported. You can find a list of supported queries in the [ibc-go documentation](https://ibc.cosmos.network/main/apps/interchain-accounts/messages/#queries) for different versions of ibc-go.
-
-Note that `WasmQuery` support works only if the counterparty chain is using wasmd `v0.52+`. Moreover, governance queries (as stargate queries) and `DistributionQuery` will be supported in the next version of the SDK.
 
 :::
 
@@ -121,12 +85,30 @@ But most of these middlewares do not yet support ICS-27 channels.
 
 ### `timeout_seconds`
 
-This is the timeout in seconds that will be used for the ICS-27 packet. It is optional and defaults to [`DEFAULT_TIMEOUT_SECONDS`](https://github.com/srdtrk/cw-ica-controller/blob/v0.5.0/src/ibc/types/packet.rs#L15-L16).
+This is the timeout in seconds that will be used for the ICS-27 packet. It is optional and defaults to [`DEFAULT_TIMEOUT_SECONDS`](https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/ibc/types/packet.rs#L15-L16).
+
+## `SendCustomIcaMessages`
+
+```rust reference
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L53-L89
+```
+
+Recall that the `SendCosmosMsgs` message is the recommended way to use the interchain account. Use this only if you
+insist on using `proto3json` encoding and you need to send messages that are not supported by the `SendCosmosMsgs`.
+
+:::note
+
+This message is redundant if the channel was opened with `tx_encoding` set to `proto3`. This is because any custom
+message you might want to send will be supported through `CosmosMsg::Stargate`.
+
+:::
+
+I will not go into the details of the fields of this message since it is not recommended to use this message.
 
 ## `UpdateCallbackAddress`
 
 ```rust reference
-https://github.com/srdtrk/cw-ica-controller/blob/v0.5.0/src/types/msg.rs#L92-L97
+https://github.com/srdtrk/cw-ica-controller/blob/v0.4.0/src/types/msg.rs#L90-L95
 ```
 
 This message is used to update the contract address that this contract will send callbacks to.

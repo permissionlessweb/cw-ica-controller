@@ -1,52 +1,61 @@
 //! This module defines the state storage of the Contract.
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, IbcChannel};
-use cw_storage_plus::Item;
+use cosmwasm_std::{Addr, IbcChannel, Storage};
+
+use secret_toolkit::storage::Item;
+use secret_toolkit::serialization::Json;
 
 use super::{msg::options::ChannelOpenInitOptions, ContractError};
 
 #[allow(clippy::module_name_repetitions)]
-pub use channel::{ChannelState, ChannelStatus};
+pub use channel::{State as ChannelState, Status as ChannelStatus};
 #[allow(clippy::module_name_repetitions)]
 pub use contract::State as ContractState;
 
-/// The item used to store the state of the IBC n.
-pub const STATE: Item<ContractState> = Item::new("state");
+/// The item used to store the owner of the contract.
+pub const OWNER: Item<Addr> = Item::new(b"owner");
+
+/// The item used to store the state of the IBC application.
+pub const STATE: Item<ContractState, Json> = Item::new(b"state");
 
 /// The item used to store the state of the IBC application's channel.
-pub const CHANNEL_STATE: Item<ChannelState> = Item::new("ica_channel");
+pub const CHANNEL_STATE: Item<ChannelState, Json> = Item::new(b"ica_channel");
 
 /// The item used to store the channel open init options.
-pub const CHANNEL_OPEN_INIT_OPTIONS: Item<ChannelOpenInitOptions> =
-    Item::new("channel_open_init_options");
+pub const CHANNEL_OPEN_INIT_OPTIONS: Item<ChannelOpenInitOptions, Json> =
+    Item::new(b"channel_open_init_options");
 
 /// The item used to store whether or not channel open init is allowed.
 /// Used to prevent relayers from opening channels. This right is reserved to the contract.
-pub const ALLOW_CHANNEL_OPEN_INIT: Item<bool> = Item::new("allow_channel_open_init");
+pub const ALLOW_CHANNEL_OPEN_INIT: Item<bool> = Item::new(b"allow_channel_open_init");
 
 /// The item used to store whether or not channel close init is allowed.
 /// Used to prevent relayers from closing channels. This right is reserved to the contract.
-pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new("allow_channel_close_init");
+pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new(b"allow_channel_close_init");
 
-/// The item used to store the paths of an ICA query until its `SendPacket` response is received.
-/// Once the response is received, it is moved to the [`PENDING_QUERIES`] map and deleted from this item.
-/// This is used to ensure that the correct sequence is recorded for the response.
-#[cfg(feature = "query")]
-pub const QUERY: Item<Vec<(String, bool)>> = Item::new("pending_query");
-
-/// `PENDING_QUERIES` is the map of pending queries.
-/// It maps `channel_id`, and sequence to the query path.
-#[cfg(feature = "query")]
-pub const PENDING_QUERIES: cw_storage_plus::Map<(&str, u64), Vec<(String, bool)>> =
-    cw_storage_plus::Map::new("pending_queries");
+/// `assert_owner` asserts that the passed address is the owner of the contract.
+///
+/// # Errors
+///
+/// Returns an error if the address is not the owner or if the owner cannot be loaded.
+pub fn assert_owner(
+    storage: &dyn Storage,
+    address: impl Into<String>,
+) -> Result<(), ContractError> {
+    if OWNER.load(storage)? != address.into() {
+        return Err(ContractError::Unauthorized);
+    }
+    Ok(())
+}
 
 mod contract {
     use crate::ibc::types::metadata::TxEncoding;
 
     use cosmwasm_schema::schemars::JsonSchema;
+    use cosmwasm_std::ContractInfo;
 
-    use super::{cw_serde, headstash::HeadstashParams, Addr, ContractError};
+    use super::{cw_serde, ContractError};
 
     /// State is the state of the contract.
     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -58,23 +67,16 @@ mod contract {
         pub ica_info: Option<IcaInfo>,
         /// The address of the callback contract.
         #[serde(default)]
-        pub callback_address: Option<Addr>,
-        /// The code ID of the snip120u code, on Secret Network.
-        pub headstash_params: HeadstashParams,
+        pub callback_contract: Option<ContractInfo>,
     }
 
     impl State {
         /// Creates a new [`State`]
         #[must_use]
-        pub const fn new(
-            callback_address: Option<Addr>,
-            headstash_params: HeadstashParams,
-        ) -> Self {
+        pub const fn new(callback_contract: Option<ContractInfo>) -> Self {
             Self {
                 ica_info: None,
-                // We always allow the first `MsgChannelOpenInit` message.
-                callback_address,
-                headstash_params,
+                callback_contract,
             }
         }
 
@@ -103,11 +105,6 @@ mod contract {
         pub fn delete_ica_info(&mut self) {
             self.ica_info = None;
         }
-
-        /// Get the params for the headstash instance
-        pub fn get_headstash_info(self) -> HeadstashParams {
-            self.headstash_params
-        }
     }
 
     /// IcaInfo is the ICA address and channel ID.
@@ -134,7 +131,6 @@ mod contract {
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
 mod channel {
     use cosmwasm_std::IbcOrder;
 
@@ -142,7 +138,7 @@ mod channel {
 
     /// Status is the status of an IBC channel.
     #[cw_serde]
-    pub enum ChannelStatus {
+    pub enum Status {
         /// Uninitialized is the default state of the channel.
         #[serde(rename = "STATE_UNINITIALIZED_UNSPECIFIED")]
         Uninitialized,
@@ -171,32 +167,32 @@ mod channel {
     /// State is the state of the IBC application's channel.
     /// This application only supports one channel.
     #[cw_serde]
-    pub struct ChannelState {
+    pub struct State {
         /// The IBC channel, as defined by cosmwasm.
         pub channel: IbcChannel,
         /// The status of the channel.
-        pub channel_status: ChannelStatus,
+        pub channel_status: Status,
     }
 
-    impl ChannelState {
+    impl State {
         /// Creates a new [`ChannelState`]
         #[must_use]
         pub const fn new_open_channel(channel: IbcChannel) -> Self {
             Self {
                 channel,
-                channel_status: ChannelStatus::Open,
+                channel_status: Status::Open,
             }
         }
 
         /// Checks if the channel is open
         #[must_use]
         pub const fn is_open(&self) -> bool {
-            matches!(self.channel_status, ChannelStatus::Open)
+            matches!(self.channel_status, Status::Open)
         }
 
         /// Closes the channel
         pub fn close(&mut self) {
-            self.channel_status = ChannelStatus::Closed;
+            self.channel_status = Status::Closed;
         }
 
         /// Checks if the channel is [`IbcOrder::Ordered`]
@@ -206,117 +202,17 @@ mod channel {
         }
     }
 
-    impl std::fmt::Display for ChannelStatus {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    impl ToString for Status {
+        fn to_string(&self) -> String {
             match self {
-                Self::Uninitialized => write!(f, "STATE_UNINITIALIZED_UNSPECIFIED"),
-                Self::Init => write!(f, "STATE_INIT"),
-                Self::TryOpen => write!(f, "STATE_TRYOPEN"),
-                Self::Open => write!(f, "STATE_OPEN"),
-                Self::Closed => write!(f, "STATE_CLOSED"),
-                Self::Flushing => write!(f, "STATE_FLUSHING"),
-                Self::FlushComplete => write!(f, "STATE_FLUSHCOMPLETE"),
+                Self::Uninitialized => "STATE_UNINITIALIZED_UNSPECIFIED".to_string(),
+                Self::Init => "STATE_INIT".to_string(),
+                Self::TryOpen => "STATE_TRYOPEN".to_string(),
+                Self::Open => "STATE_OPEN".to_string(),
+                Self::Closed => "STATE_CLOSED".to_string(),
+                Self::Flushing => "STATE_FLUSHING".to_string(),
+                Self::FlushComplete => "STATE_FLUSHCOMPLETE".to_string(),
             }
         }
     }
-}
-
-/// This module defines the types stored in the state for ICA queries.
-#[cfg(feature = "query")]
-pub mod ica_query {
-    use super::cw_serde;
-
-    /// PendingQuery is the query packet that is pending a response.
-    #[cw_serde]
-    pub struct PendingQuery {
-        /// The source channel ID of the query packet.
-        pub channel_id: String,
-        /// The sequence number of the query packet.
-        pub sequence: u64,
-        /// The gRPC query path.
-        pub path: String,
-        /// Whether the query was [`cosmwasm_std::QueryRequest::Stargate`] or not.
-        pub is_stargate: bool,
-    }
-}
-/// Headstash specific types
-pub mod headstash {
-
-    use crate::types::ContractError;
-
-    use super::{cw_serde, STATE};
-    use cosmwasm_std::{Coin, DepsMut};
-
-    /// Params for Headstash Tokens
-    #[cw_serde]
-    pub struct HeadstashTokenParams {
-        /// Name to use in snip120u state
-        pub name: String,
-        /// Symbol to use
-        pub symbol: String,
-        /// native token name
-        pub native: String,
-        /// ibc string on Secret
-        pub ibc: String,
-        /// snip20 addr on Secret
-        pub snip_addr: Option<String>,
-    }
-    /// Params for Headstash
-    #[cw_serde]
-    pub struct HeadstashParams {
-        /// The code ID of the snip120u contract, on Secret Network.
-        pub snip120u_code_id: u64,
-        /// The code hash of the snip120u contract, on Secret Network.
-        pub snip120u_code_hash: String,
-        /// Code id of Headstash contract on Secret Network
-        pub headstash_code_id: Option<u64>,
-        /// Params defined by deployer for tokens included
-        pub token_params: Vec<HeadstashTokenParams>,
-        /// Headstash contract address this contract is admin of.
-        /// We save this address in the first callback msg sent during setup_headstash,
-        /// and then use it to set as admin for snip120u of assets after 1st callback.
-        pub headstash: Option<String>,
-        /// The wallet address able to create feegrant authorizations on behalf of this contract
-        pub feegranter: Option<String>,
-    }
-
-    impl HeadstashParams {
-        /// creates new headstash param instance
-        pub fn new(
-            snip120u_code_id: u64,
-            snip120u_code_hash: String,
-            token_params: Vec<HeadstashTokenParams>,
-        ) -> Self {
-            Self {
-                snip120u_code_id,
-                snip120u_code_hash,
-                headstash_code_id: None,
-                token_params,
-                headstash: None,
-                feegranter: None,
-            }
-        }
-    }
-
-    impl HeadstashTokenParams {
-        /// loads token params for a given coin.
-        pub fn from_coin(deps: DepsMut, coin: Coin) -> Result<Self, ContractError> {
-            let param = STATE.load(deps.storage).unwrap().headstash_params;
-            let token_param = param
-                .token_params
-                .iter()
-                .find(|tp| tp.native == coin.denom || tp.ibc == coin.denom);
-            match token_param {
-                Some(tp) => {
-                    // Create your struct using tp
-                    Ok(tp.clone())
-                }
-                None => {
-                    return Err(ContractError::BadHeadstashCoin);
-                }
-            }
-        }
-    }
-
-    impl HeadstashParams {}
 }

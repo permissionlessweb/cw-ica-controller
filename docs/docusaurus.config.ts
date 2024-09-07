@@ -1,5 +1,5 @@
-import { themes as prismThemes } from 'prism-react-renderer';
-import type { Config } from '@docusaurus/types';
+import {themes as prismThemes} from 'prism-react-renderer';
+import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
@@ -38,32 +38,20 @@ const config: Config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/srdtrk/cw-ica-controller/tree/main/docs',
+            'https://github.com/srdtrk/cw-ica-controller/tree/feat/docusaurus-docs/docs',
           // Routed the docs to the root path
           routeBasePath: "/",
           sidebarCollapsed: false,
           // Select the latest version
-          lastVersion: "v0.20.x",
+          lastVersion: "v0.4.x",
           versions: {
             current: {
               label: 'main',
               path: 'main',
               banner: 'unreleased',
             },
-            "v0.20.x": {
-              label: 'v0.20.x',
-              path: 'v0.20',
-            },
-            "v0.6.x": {
-              label: 'v0.6.x',
-              path: 'v0.6',
-            },
-            "v0.5.x": {
-              label: 'v0.5.x',
-              path: 'v0.5',
-            },
             "v0.4.x": {
-              label: 'v0.4.x',
+              label: 'v0.4',
               path: 'v0.4',
             },
           },
@@ -166,10 +154,10 @@ const config: Config = {
     },
     // github codeblock theme configuration
     codeblock: {
-      showGithubLink: true,
-      githubLinkLabel: 'View on GitHub',
-      showRunmeLink: false,
-      runmeLinkLabel: 'Checkout via Runme'
+        showGithubLink: true,
+        githubLinkLabel: 'View on GitHub',
+        showRunmeLink: false,
+        runmeLinkLabel: 'Checkout via Runme'
     },
   } satisfies Preset.ThemeConfig,
   plugins: [

@@ -100,7 +100,7 @@ impl IcaMetadata {
 
         Ok(Self {
             version: ICA_VERSION.to_string(),
-            encoding: TxEncoding::Protobuf,
+            encoding: options.tx_encoding(),
             controller_connection_id: options.connection_id,
             // counterparty connection_id is not exposed to the contract, so we
             // use a stargate query to get it. Stargate queries are not universally
@@ -126,12 +126,10 @@ impl IcaMetadata {
         if self.controller_connection_id != channel.connection_id {
             return Err(ContractError::InvalidConnection);
         }
-        if !matches!(self.encoding, TxEncoding::Protobuf) {
-            return Err(ContractError::UnsupportedPacketEncoding(
-                self.encoding.to_string(),
-            ));
-        }
         // We cannot check the counterparty connection_id because it is not exposed to the contract
+        // if self.host_connection_id != channel.counterparty_endpoint.connection_id {
+        //     return Err(ContractError::InvalidConnection);
+        // }
         if !self.address.is_empty() {
             validate_ica_address(&self.address)?;
         }
@@ -142,15 +140,15 @@ impl IcaMetadata {
     }
 }
 
-impl std::fmt::Display for IcaMetadata {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&serde_json_wasm::to_string(self).unwrap())
+impl ToString for IcaMetadata {
+    fn to_string(&self) -> String {
+        serde_json_wasm::to_string(self).unwrap()
     }
 }
 
-impl std::fmt::Display for TxEncoding {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&serde_json_wasm::to_string(self).unwrap())
+impl ToString for TxEncoding {
+    fn to_string(&self) -> String {
+        serde_json_wasm::to_string(self).unwrap()
     }
 }
 
@@ -227,6 +225,7 @@ mod tests {
         let stored_init_options = ChannelOpenInitOptions {
             connection_id: "connection-0".to_string(),
             counterparty_connection_id: "connection-1".to_string(),
+            tx_encoding: None,
             counterparty_port_id: Some(super::super::keys::HOST_PORT_ID.to_string()),
             channel_ordering: None,
         };
@@ -256,6 +255,7 @@ mod tests {
         let stored_init_options = ChannelOpenInitOptions {
             connection_id: "connection-0".to_string(),
             counterparty_connection_id: "connection-1".to_string(),
+            tx_encoding: None,
             counterparty_port_id: Some(super::super::keys::HOST_PORT_ID.to_string()),
             channel_ordering: None,
         };

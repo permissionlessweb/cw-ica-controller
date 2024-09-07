@@ -3,9 +3,8 @@
 //! This module defines the messages that this contract receives.
 
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::CosmosMsg;
+use cosmwasm_std::{Binary, CosmosMsg};
 
-use super::state::headstash::HeadstashParams;
 /// The message to instantiate the ICA controller contract.
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -18,16 +17,19 @@ pub struct InstantiateMsg {
     /// The contract address that the channel and packet lifecycle callbacks are sent to.
     /// If not specified, then no callbacks are sent.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub send_callbacks_to: Option<String>,
-    /// Params for headstash airdrop
-    pub headstash_params: HeadstashParams,
+    pub send_callbacks_to: Option<CallbackInfo>,
+}
+
+/// The info needed to send callbacks
+#[cw_serde]
+pub struct CallbackInfo {
+    /// The address of the callback contract.
+    pub address: String,
+    /// The code hash of the callback contract.
+    pub code_hash: String,
 }
 
 /// The messages to execute the ICA controller contract.
-#[derive(cw_orch::ExecuteFns)]
-#[cw_ownable::cw_ownable_execute]
-#[serde_with::serde_as]
-#[non_exhaustive]
 #[cw_serde]
 pub enum ExecuteMsg {
     /// `CreateChannel` makes the contract submit a stargate MsgChannelOpenInit to the chain.
@@ -49,15 +51,44 @@ pub enum ExecuteMsg {
     /// **This is the recommended way to send messages to the ICA host.**
     SendCosmosMsgs {
         /// The stargate messages to convert and send to the ICA host.
-        #[serde_as(deserialize_as = "serde_with::DefaultOnNull")]
         messages: Vec<CosmosMsg>,
-        /// The stargate queries to convert and send to the ICA host.
-        /// The queries are executed after the messages.
-        #[cfg(feature = "query")]
-        #[serde(skip_serializing_if = "Vec::is_empty")]
-        #[serde(default)]
-        #[serde_as(deserialize_as = "serde_with::DefaultOnNull")]
-        queries: Vec<cosmwasm_std::QueryRequest<cosmwasm_std::Empty>>,
+        /// Optional memo to include in the ibc packet.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        packet_memo: Option<String>,
+        /// Optional timeout in seconds to include with the ibc packet.
+        /// If not specified, the [default timeout](crate::ibc::types::packet::DEFAULT_TIMEOUT_SECONDS) is used.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        timeout_seconds: Option<u64>,
+    },
+    /// `SendCustomIcaMessages` sends custom messages from the ICA controller to the ICA host.
+    ///
+    /// **Use this only if you know what you are doing.**
+    SendCustomIcaMessages {
+        /// Base64-encoded json or proto messages to send to the ICA host.
+        ///
+        /// # Example JSON Message:
+        ///
+        /// This is a legacy text governance proposal message serialized using proto3json.
+        ///
+        /// ```json
+        ///  {
+        ///    "messages": [
+        ///      {
+        ///        "@type": "/cosmos.gov.v1beta1.MsgSubmitProposal",
+        ///        "content": {
+        ///          "@type": "/cosmos.gov.v1beta1.TextProposal",
+        ///          "title": "IBC Gov Proposal",
+        ///          "description": "tokens for all!"
+        ///        },
+        ///        "initial_deposit": [{ "denom": "stake", "amount": "5000" }],
+        ///        "proposer": "cosmos1k4epd6js8aa7fk4e5l7u6dwttxfarwu6yald9hlyckngv59syuyqnlqvk8"
+        ///      }
+        ///    ]
+        ///  }
+        /// ```
+        ///
+        /// where proposer is the ICA controller's address.
+        messages: Binary,
         /// Optional memo to include in the ibc packet.
         #[serde(skip_serializing_if = "Option::is_none")]
         packet_memo: Option<String>,
@@ -70,15 +101,18 @@ pub enum ExecuteMsg {
     UpdateCallbackAddress {
         /// The new callback address.
         /// If not specified, then no callbacks are sent.
-        callback_address: Option<String>,
+        callback_contract: Option<CallbackInfo>,
+    },
+    /// `UpdateOwnership` updates the contract owner.
+    UpdateOwnership {
+        /// The new owner of the contract.
+        owner: String,
     },
 }
 
 /// The messages to query the ICA controller contract.
-#[cw_ownable::cw_ownable_query]
-#[non_exhaustive]
 #[cw_serde]
-#[derive(QueryResponses,cw_orch::QueryFns)]
+#[derive(QueryResponses)]
 pub enum QueryMsg {
     /// GetChannel returns the IBC channel info.
     #[returns(crate::types::state::ChannelState)]
@@ -86,27 +120,20 @@ pub enum QueryMsg {
     /// GetContractState returns the contact's state.
     #[returns(crate::types::state::ContractState)]
     GetContractState {},
+    /// Ownership returns the owner of the contract.
+    #[returns(String)]
+    Ownership {},
 }
-
-/// The message to migrate this contract.
-#[cw_serde]
-pub struct MigrateMsg {}
 
 /// Option types for other messages.
 pub mod options {
     use cosmwasm_std::IbcOrder;
 
-    /// The options needed to initialize the IBC channel.
-    #[derive(
-        serde::Serialize,
-        serde::Deserialize,
-        Clone,
-        Debug,
-        PartialEq,
-        cosmwasm_schema::schemars::JsonSchema,
-    )]
-    #[allow(clippy::derive_partial_eq_without_eq)]
-    #[schemars(crate = "::cosmwasm_schema::schemars")]
+    use super::cw_serde;
+    use crate::ibc::types::{keys::HOST_PORT_ID, metadata::TxEncoding};
+
+    /// The message used to provide the MsgChannelOpenInit with the required data.
+    #[cw_serde]
     pub struct ChannelOpenInitOptions {
         /// The connection id on this chain.
         pub connection_id: String,
@@ -115,6 +142,8 @@ pub mod options {
         /// The counterparty port id. If not specified, [`crate::ibc::types::keys::HOST_PORT_ID`] is used.
         /// Currently, this contract only supports the host port.
         pub counterparty_port_id: Option<String>,
+        /// TxEncoding is the encoding used for the ICA txs. If not specified, [`TxEncoding::Protobuf`] is used.
+        pub tx_encoding: Option<TxEncoding>,
         /// The order of the channel. If not specified, [`IbcOrder::Ordered`] is used.
         /// [`IbcOrder::Unordered`] is only supported if the counterparty chain is using `ibc-go`
         /// v8.1.0 or later.
@@ -127,7 +156,13 @@ pub mod options {
         pub fn counterparty_port_id(&self) -> String {
             self.counterparty_port_id
                 .clone()
-                .unwrap_or_else(|| crate::ibc::types::keys::HOST_PORT_ID.to_string())
+                .unwrap_or_else(|| HOST_PORT_ID.to_string())
+        }
+
+        /// Returns the tx encoding.
+        #[must_use]
+        pub fn tx_encoding(&self) -> TxEncoding {
+            self.tx_encoding.clone().unwrap_or(TxEncoding::Protobuf)
         }
     }
 }

@@ -3,12 +3,12 @@
 //! This module contains the ICS-27 packet data and acknowledgement types.
 
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{to_json_binary, CosmosMsg, Env, IbcMsg, IbcTimeout, StdError, StdResult};
+use cosmwasm_std::{to_binary, CosmosMsg, Env, IbcMsg, IbcTimeout, StdError, StdResult};
 
 pub use cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx;
 use cosmos_sdk_proto::traits::Message;
 
-use crate::types::cosmos_msg::convert_to_proto_any;
+use crate::types::cosmos_msg::{convert_to_proto3json, convert_to_proto_any};
 
 use super::metadata::TxEncoding;
 
@@ -18,9 +18,8 @@ pub const DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 /// `IcaPacketData` is comprised of a raw transaction, type of transaction and optional memo field.
 /// Currently, the host only supports [protobuf](super::metadata::TxEncoding::Protobuf) or
 /// [proto3json](super::metadata::TxEncoding::Proto3Json) serialized Cosmos transactions.
-/// This contract only supports the protobuf encoding.
 ///
-/// When protobuf is used, then the raw transaction must encoded using
+/// If protobuf is used, then the raw transaction must encoded using
 /// [`CosmosTx`](cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx).
 #[allow(clippy::module_name_repetitions)]
 #[cw_serde]
@@ -55,6 +54,39 @@ impl IcaPacketData {
         }
     }
 
+    /// Creates a new [`IcaPacketData`] from a list of JSON strings
+    ///
+    /// The messages must be serialized as JSON strings in the format expected by the ICA host.
+    /// The following is an example with one legacy gov proposal message:
+    ///
+    /// ## Format
+    ///
+    /// ```json
+    /// {
+    ///   "messages": [
+    ///     {
+    ///       "@type": "/cosmos.gov.v1beta1.MsgSubmitProposal",
+    ///       "content": {
+    ///         "@type": "/cosmos.gov.v1beta1.TextProposal",
+    ///         "title": "IBC Gov Proposal",
+    ///         "description": "tokens for all!"
+    ///       },
+    ///       "initial_deposit": [{ "denom": "stake", "amount": "5000" }],
+    ///       "proposer": "cosmos1k4epd6js8aa7fk4e5l7u6dwttxfarwu6yald9hlyckngv59syuyqnlqvk8"
+    ///     }
+    ///   ]
+    /// }
+    /// ```
+    ///
+    /// In this example, the proposer must be the ICA controller's address.
+    #[must_use]
+    pub fn from_json_strings(messages: &[String], memo: Option<String>) -> Self {
+        let combined_messages = messages.join(", ");
+        let json_txs = format!(r#"{{"messages": [{combined_messages}]}}"#);
+        let data = json_txs.into_bytes();
+        Self::new(data, memo)
+    }
+
     /// Creates a new [`IcaPacketData`] from a list of [`cosmos_sdk_proto::Any`] messages
     #[must_use]
     pub fn from_proto_anys(messages: Vec<cosmos_sdk_proto::Any>, memo: Option<String>) -> Self {
@@ -72,79 +104,10 @@ impl IcaPacketData {
     ///
     /// # Panics
     ///
-    /// Panics if the [`CosmosMsg`] is not supported.
+    /// Panics if the [`CosmosMsg`] is not supported for the given encoding.
     ///
     /// The supported [`CosmosMsg`]s for [`TxEncoding::Protobuf`] are listed in [`convert_to_proto_any`].
-    #[cfg(feature = "query")]
-    pub fn from_cosmos_msgs(
-        #[cfg(feature = "export")] storage: &mut dyn cosmwasm_std::Storage,
-        messages: Vec<CosmosMsg>,
-        queries: Vec<cosmwasm_std::QueryRequest<cosmwasm_std::Empty>>,
-        encoding: &TxEncoding,
-        memo: Option<String>,
-        ica_address: &str,
-    ) -> StdResult<Self> {
-        match encoding {
-            TxEncoding::Protobuf => {
-                use crate::types::query_msg;
-
-                let mut proto_anys = messages
-                    .into_iter()
-                    .map(|msg| -> StdResult<cosmos_sdk_proto::Any> {
-                        convert_to_proto_any(msg, ica_address.to_string())
-                            .map_err(|e| StdError::generic_err(e.to_string()))
-                    })
-                    .collect::<StdResult<Vec<cosmos_sdk_proto::Any>>>()?;
-
-                if !queries.is_empty() {
-                    let (abci_queries, _paths): (
-                        Vec<query_msg::proto::AbciQueryRequest>,
-                        Vec<(String, bool)>,
-                    ) = queries.into_iter().fold((vec![], vec![]), |mut acc, msg| {
-                        let (path, data, is_stargate) = query_msg::query_to_protobuf(msg);
-
-                        acc.1.push((path.clone(), is_stargate));
-                        acc.0
-                            .push(query_msg::proto::AbciQueryRequest { path, data });
-
-                        acc
-                    });
-
-                    #[cfg(feature = "export")]
-                    #[allow(clippy::used_underscore_binding)]
-                    crate::types::state::QUERY.save(storage, &_paths)?;
-
-                    let query_msg = query_msg::proto::MsgModuleQuerySafe {
-                        signer: ica_address.to_string(),
-                        requests: abci_queries,
-                    };
-
-                    proto_anys.push(cosmos_sdk_proto::Any::from_msg(&query_msg).map_err(|e| {
-                        StdError::generic_err(format!("failed to convert query msg: {e}"))
-                    })?);
-                }
-
-                Ok(Self::from_proto_anys(proto_anys, memo))
-            }
-            TxEncoding::Proto3Json => StdResult::Err(StdError::generic_err(
-                "unsupported encoding: proto3json".to_string(),
-            )),
-        }
-    }
-
-    /// Creates a new [`IcaPacketData`] from a list of [`CosmosMsg`] messages
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the [`CosmosMsg`] cannot be serialized to [`cosmos_sdk_proto::Any`]
-    /// when using the [`TxEncoding::Protobuf`] encoding.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the [`CosmosMsg`] is not supported.
-    ///
-    /// The supported [`CosmosMsg`]s for [`TxEncoding::Protobuf`] are listed in [`convert_to_proto_any`].
-    #[cfg(not(feature = "query"))]
+    /// The supported [`CosmosMsg`]s for [`TxEncoding::Proto3Json`] are listed in [`convert_to_proto3json`].
     pub fn from_cosmos_msgs(
         messages: Vec<CosmosMsg>,
         encoding: &TxEncoding,
@@ -153,19 +116,24 @@ impl IcaPacketData {
     ) -> StdResult<Self> {
         match encoding {
             TxEncoding::Protobuf => {
-                let proto_anys = messages
-                    .into_iter()
-                    .map(|msg| -> StdResult<cosmos_sdk_proto::Any> {
-                        convert_to_proto_any(msg, ica_address.to_string())
-                            .map_err(|e| StdError::generic_err(e.to_string()))
-                    })
-                    .collect::<StdResult<Vec<cosmos_sdk_proto::Any>>>()?;
-
+                let proto_anys = messages.into_iter().try_fold(
+                    vec![],
+                    |mut acc, msg| -> StdResult<Vec<cosmos_sdk_proto::Any>> {
+                        let proto_any = convert_to_proto_any(msg, ica_address.to_string())
+                            .map_err(|e| StdError::generic_err(e.to_string()))?;
+                        acc.push(proto_any);
+                        Ok(acc)
+                    },
+                )?;
                 Ok(Self::from_proto_anys(proto_anys, memo))
             }
-            TxEncoding::Proto3Json => StdResult::Err(StdError::generic_err(
-                "unsupported encoding: proto3json".to_string(),
-            )),
+            TxEncoding::Proto3Json => {
+                let json_strings = messages
+                    .into_iter()
+                    .map(|msg| convert_to_proto3json(msg, ica_address.to_string()))
+                    .collect::<Vec<String>>();
+                Ok(Self::from_json_strings(&json_strings, memo))
+            }
         }
     }
 
@@ -186,7 +154,7 @@ impl IcaPacketData {
             .plus_seconds(timeout_seconds.unwrap_or(DEFAULT_TIMEOUT_SECONDS));
         Ok(IbcMsg::SendPacket {
             channel_id: channel_id.into(),
-            data: to_json_binary(&self)?,
+            data: to_binary(&self)?,
             timeout: IbcTimeout::with_timestamp(timeout_timestamp),
         })
     }
@@ -196,15 +164,7 @@ impl IcaPacketData {
 pub mod acknowledgement {
     use cosmwasm_std::Binary;
 
-    use cosmos_sdk_proto::cosmos::base::abci::v1beta1::TxMsgData;
-    use cosmos_sdk_proto::prost::Message;
-
-    use crate::types::ContractError;
-
-    #[cfg(feature = "query")]
-    use crate::types::query_msg;
-
-    use super::{cw_serde, StdError};
+    use super::cw_serde;
 
     /// `Data` is the response to an ibc packet. It either contains a result or an error.
     #[cw_serde]
@@ -215,63 +175,12 @@ pub mod acknowledgement {
         /// It is a string of the error message (not base64 encoded).
         Error(String),
     }
-
-    impl Data {
-        /// `to_tx_msg_data` converts the acknowledgement to a [`TxMsgData`].
-        ///
-        /// # Errors
-        /// Returns an error if the acknowledgement is an error or if the data cannot be decoded.
-        pub fn to_tx_msg_data(&self) -> Result<TxMsgData, ContractError> {
-            match self {
-                Self::Result(data) => Ok(TxMsgData::decode(data.as_slice())?),
-                Self::Error(err) => Err(StdError::generic_err(err))?,
-            }
-        }
-
-        /// `decode_module_query_safe_resp` decodes the acknowledgement at the given index to a [`query_msg::proto::MsgModuleQuerySafeResponse`].
-        ///
-        /// # Errors
-        /// Returns an error if the acknowledgement is an error or if the data at the index cannot be decoded.
-        #[cfg(feature = "query")]
-        pub fn decode_module_query_safe_resp(
-            &self,
-            index: usize,
-        ) -> Result<query_msg::proto::MsgModuleQuerySafeResponse, ContractError> {
-            let tx_msg_data = self.to_tx_msg_data()?;
-            let msg_resp = tx_msg_data.msg_responses.get(index).ok_or_else(|| {
-                StdError::generic_err("no MsgData found at the given index".to_string())
-            })?;
-
-            Ok(query_msg::proto::MsgModuleQuerySafeResponse::decode(
-                msg_resp.value.as_slice(),
-            )?)
-        }
-
-        /// `decode_module_query_safe_resp` decodes the acknowledgement at the last index to a [`query_msg::proto::MsgModuleQuerySafeResponse`].
-        /// This is a convenience function since the contract only sends one query at the last index.
-        ///
-        /// # Errors
-        /// Returns an error if the acknowledgement is an error or if the data at the index cannot be decoded.
-        #[cfg(feature = "export")]
-        pub fn decode_module_query_safe_resp_last_index(
-            &self,
-        ) -> Result<query_msg::proto::MsgModuleQuerySafeResponse, ContractError> {
-            let tx_msg_data = self.to_tx_msg_data()?;
-            let msg_resp = tx_msg_data.msg_responses.last().ok_or_else(|| {
-                StdError::generic_err("no MsgData found at the given index".to_string())
-            })?;
-
-            Ok(query_msg::proto::MsgModuleQuerySafeResponse::decode(
-                msg_resp.value.as_slice(),
-            )?)
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use acknowledgement::Data as AcknowledgementData;
-    use cosmwasm_std::{from_json, Binary};
+    use cosmwasm_std::{from_binary, Binary};
 
     use super::*;
 
@@ -280,11 +189,11 @@ mod tests {
         // Test result:
         // The following bytes refer to `{"result":"c3VjY2Vzcw=="}`
         // where `c3VjY2Vzcw==` is the base64 encoding of `success`.
-        let cw_success_binary = Binary::new(vec![
+        let cw_success_binary = Binary(vec![
             123, 34, 114, 101, 115, 117, 108, 116, 34, 58, 34, 99, 51, 86, 106, 89, 50, 86, 122,
             99, 119, 61, 61, 34, 125,
         ]);
-        let ack: AcknowledgementData = from_json(cw_success_binary).unwrap();
+        let ack: AcknowledgementData = from_binary(&cw_success_binary).unwrap();
         assert_eq!(
             ack,
             AcknowledgementData::Result(Binary::from_base64("c3VjY2Vzcw==").unwrap())
@@ -293,8 +202,8 @@ mod tests {
         // Test error:
         let error_bytes =
             br#"{"error":"ABCI code: 1: error handling packet: see events for details"}"#;
-        let cw_error_binary = Binary::from(error_bytes);
-        let ack: AcknowledgementData = from_json(cw_error_binary).unwrap();
+        let cw_error_binary = Binary(error_bytes.to_vec());
+        let ack: AcknowledgementData = from_binary(&cw_error_binary).unwrap();
         assert_eq!(
             ack,
             AcknowledgementData::Error(

@@ -6,10 +6,6 @@ on:
     paths:
       - '**.rs'
       - '**.go'
-      - '**.toml'
-      - '**.lock'
-      - '**.mod'
-      - '**.sum'
       - '.github/workflows/e2e.yml'
 permissions:
   contents: read
@@ -18,63 +14,85 @@ jobs:
     name: lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v4
         with:
-          go-version: "1.22"
-      - uses: actions/checkout@v4
+          go-version: "1.21"
+      - uses: actions/checkout@v3
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3.7.0
         with:
-          version: v1.59
+          version: v1.54
           args: --timeout 5m
-          working-directory: e2e/interchaintestv8
+          working-directory: e2e/interchaintest
   build:
     strategy:
       fail-fast: false
       matrix:
         test:
-          - TestWithContractTestSuite/TestIcaContractChannelHandshake_Ordered_Protobuf
-          - TestWithContractTestSuite/TestIcaContractChannelHandshake_Unordered_Protobuf
-          - TestWithContractTestSuite/TestIcaRelayerInstantiatedChannelHandshake
-          - TestWithContractTestSuite/TestRecoveredIcaContractInstantiatedChannelHandshake
-          - TestWithContractTestSuite/TestIcaContractExecution_Ordered_Protobuf
-          - TestWithContractTestSuite/TestIcaContractExecution_Unordered_Protobuf
-          - TestWithContractTestSuite/TestIcaContractTimeoutPacket_Ordered_Protobuf
-          - TestWithContractTestSuite/TestIcaContractTimeoutPacket_Unordered_Protobuf
-          - TestWithOwnerTestSuite/TestOwnerCreateIcaContract
-          - TestWithOwnerTestSuite/TestOwnerPredefinedAction
-          - TestWithContractTestSuite/TestSendCosmosMsgs_Ordered_Protobuf
-          - TestWithContractTestSuite/TestSendCosmosMsgs_Unordered_Protobuf
-          - TestWithContractTestSuite/TestMigrateOrderedToUnordered
-          - TestWithContractTestSuite/TestCloseChannel_Protobuf_Unordered
-          - TestWithContractTestSuite/TestBankAndStargateQueries
-          - TestWithContractTestSuite/TestStakingQueries
-          - TestWithWasmTestSuite/TestSendWasmMsgs
-          - TestWithWasmTestSuite/TestSendWasmQueries
+          - TestIcaContractChannelHandshake_Ordered_Protobuf
+          - TestIcaContractChannelHandshake_Ordered_Proto3Json
+          - TestIcaContractChannelHandshake_Unordered_Protobuf
+          - TestIcaContractChannelHandshake_Unordered_Proto3Json
+          - TestIcaRelayerInstantiatedChannelHandshake
+          - TestRecoveredIcaContractInstantiatedChannelHandshake
+          - TestIcaContractExecution_Ordered_Proto3Json
+          - TestIcaContractExecution_Unordered_Protobuf
+          - TestIcaContractTimeoutPacket_Ordered_Proto3Json
+          - TestIcaContractTimeoutPacket_Unordered_Protobuf
+          - TestOwnerCreateIcaContract
+          - TestOwnerPredefinedAction
+          - TestSendCosmosMsgs_Ordered_Proto3Json
+          - TestSendCosmosMsgs_Unordered_Protobuf
+          - TestSendWasmMsgsProtobufEncoding
+          - TestMigrateOrderedToUnordered
+          - TestCloseChannel_Protobuf_Unordered
     name: ${{ matrix.test }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v4
-      - name: Install just
-        uses: extractions/setup-just@v2
-      - name: Build Test Contracts with Docker
-        run: just build-test-contracts
-      - name: Build Optimized Contract
-        run: just build-optimize
-      - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/checkout@v3
+      - name: Build Owner Contract with Docker
+        run: |
+          docker run --rm -v "$(pwd)":/code \
+            --mount type=volume,source="devcontract_cache_burner",target=/code/contracts/burner/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:0.15.0 ./testing/contracts/cw-ica-owner
+      - name: Build Callback Contract with Docker
+        run: |
+          docker run --rm -v "$(pwd)":/code \
+            --mount type=volume,source="devcontract_cache_burner",target=/code/contracts/burner/target \
+            --mount type=volume,source=registry_cache,target=/usr/local/cargo/registry \
+            cosmwasm/optimizer:0.15.0 ./testing/contracts/callback-counter
+      - name: Install cargo-run-script
+        uses: actions-rs/cargo@v1
         with:
-          go-version: "1.22"
+          command: install
+          args: cargo-run-script
+      - name: Build Optimized Contract
+        uses: actions-rs/cargo@v1
+        with:
+          command: run-script
+          args: optimize
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
           check-latest: true
           cache-dependency-path: |
-             e2e/interchaintestv8/go.sum
+             e2e/interchaintest/go.sum
       - name: TestContract
-        run: just e2e-test ${{ matrix.test }}
+        run: |
+          cd e2e/interchaintest
+          if [[ ${{ matrix.test }} == TestOwner* ]]; then
+            go test -v . -run TestWithOwnerTestSuite -testify.m ${{ matrix.test }}
+          else
+            go test -v . -run TestWithContractTestSuite -testify.m ${{ matrix.test }}
+          fi
       - name: Upload Diagnostics on Failure
         uses: actions/upload-artifact@v4
         if: ${{ failure() }}
         continue-on-error: true
         with:
-          path: e2e/interchaintestv8/diagnostics
+          name: '${{ matrix.entrypoint }}-${{ matrix.test }}'
+          path: e2e/diagnostics
           retention-days: 5
