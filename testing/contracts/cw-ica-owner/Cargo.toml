@@ -37,13 +37,3 @@ serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"
 thiserror = "1.0"
 # secret headstash specific imports
-snip20-reference-impl = { git = "https://github.com/scrtlabs/snip20-reference-impl", rev = "ea9fb0cd76f3e0d48e86b4d02a3990f2f4a84d00" }
-secret-cosmwasm-std = { package = "cosmwasm-std",git = "https://github.com/scrtlabs/cosmwasm/", default-features = false, tag = "v1.1.9-secret" }
-headstash-cosmwasm-std  = { package = "secret-cosmwasm-std", version = "1.1.11", features = [
-  "stargate",
-  "staking",
-  "ibc3",
-  "random",
-] }
-secret_headstash = { git = "https://github.com/permissionlessweb/secret-airdrop", rev = "0a13bb4027c87fb88cc5fdd6d541ed1b7a930d1e" }
-scrt-headstash-ica-owner  = { package = "cw-ica-owner", git = "https://github.com/srdtrk/cw-ica-controller", rev = "9eb2c75992c36239cf4b0806f15d3f515b69c349" }

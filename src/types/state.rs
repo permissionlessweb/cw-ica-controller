@@ -46,7 +46,7 @@ mod contract {
 
     use cosmwasm_schema::schemars::JsonSchema;
 
-    use super::{cw_serde, headstash::HeadstashParams, Addr, ContractError};
+    use super::{cw_serde, Addr, ContractError};
 
     /// State is the state of the contract.
     #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -59,8 +59,6 @@ mod contract {
         /// The address of the callback contract.
         #[serde(default)]
         pub callback_address: Option<Addr>,
-        /// The code ID of the snip120u code, on Secret Network.
-        pub headstash_params: HeadstashParams,
     }
 
     impl State {
@@ -68,13 +66,11 @@ mod contract {
         #[must_use]
         pub const fn new(
             callback_address: Option<Addr>,
-            headstash_params: HeadstashParams,
         ) -> Self {
             Self {
                 ica_info: None,
                 // We always allow the first `MsgChannelOpenInit` message.
                 callback_address,
-                headstash_params,
             }
         }
 
@@ -104,10 +100,10 @@ mod contract {
             self.ica_info = None;
         }
 
-        /// Get the params for the headstash instance
-        pub fn get_headstash_info(self) -> HeadstashParams {
-            self.headstash_params
-        }
+        // /// Get the params for the headstash instance
+        // pub fn get_headstash_info(self) -> HeadstashParams {
+        //     self.headstash_params
+        // }
     }
 
     /// IcaInfo is the ICA address and channel ID.
@@ -238,85 +234,4 @@ pub mod ica_query {
         /// Whether the query was [`cosmwasm_std::QueryRequest::Stargate`] or not.
         pub is_stargate: bool,
     }
-}
-/// Headstash specific types
-pub mod headstash {
-
-    use crate::types::ContractError;
-
-    use super::{cw_serde, STATE};
-    use cosmwasm_std::{Coin, DepsMut};
-
-    /// Params for Headstash Tokens
-    #[cw_serde]
-    pub struct HeadstashTokenParams {
-        /// Name to use in snip120u state
-        pub name: String,
-        /// Symbol to use
-        pub symbol: String,
-        /// native token name
-        pub native: String,
-        /// ibc string on Secret
-        pub ibc: String,
-        /// snip20 addr on Secret
-        pub snip_addr: Option<String>,
-    }
-    /// Params for Headstash
-    #[cw_serde]
-    pub struct HeadstashParams {
-        /// The code ID of the snip120u contract, on Secret Network.
-        pub snip120u_code_id: u64,
-        /// The code hash of the snip120u contract, on Secret Network.
-        pub snip120u_code_hash: String,
-        /// Code id of Headstash contract on Secret Network
-        pub headstash_code_id: Option<u64>,
-        /// Params defined by deployer for tokens included
-        pub token_params: Vec<HeadstashTokenParams>,
-        /// Headstash contract address this contract is admin of.
-        /// We save this address in the first callback msg sent during setup_headstash,
-        /// and then use it to set as admin for snip120u of assets after 1st callback.
-        pub headstash: Option<String>,
-        /// The wallet address able to create feegrant authorizations on behalf of this contract
-        pub feegranter: Option<String>,
-    }
-
-    impl HeadstashParams {
-        /// creates new headstash param instance
-        pub fn new(
-            snip120u_code_id: u64,
-            snip120u_code_hash: String,
-            token_params: Vec<HeadstashTokenParams>,
-        ) -> Self {
-            Self {
-                snip120u_code_id,
-                snip120u_code_hash,
-                headstash_code_id: None,
-                token_params,
-                headstash: None,
-                feegranter: None,
-            }
-        }
-    }
-
-    impl HeadstashTokenParams {
-        /// loads token params for a given coin.
-        pub fn from_coin(deps: DepsMut, coin: Coin) -> Result<Self, ContractError> {
-            let param = STATE.load(deps.storage).unwrap().headstash_params;
-            let token_param = param
-                .token_params
-                .iter()
-                .find(|tp| tp.native == coin.denom || tp.ibc == coin.denom);
-            match token_param {
-                Some(tp) => {
-                    // Create your struct using tp
-                    Ok(tp.clone())
-                }
-                None => {
-                    return Err(ContractError::BadHeadstashCoin);
-                }
-            }
-        }
-    }
-
-    impl HeadstashParams {}
 }

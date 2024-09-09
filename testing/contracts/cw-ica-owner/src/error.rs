@@ -22,12 +22,15 @@ pub enum ContractError {
     #[error("ica information is not set, headstash")]
     NoIcaInfo {},
 
+    #[error("bad headstash coin")]
+    BadHeadstashCoin,
+
     #[error("CallbackError")]
     CallbackError {},
 
     #[error("not a valid feegranter address")]
     NotValidFeegranter {},
-    
+
     #[error("headstash information is not set")]
     NoHeadstashInfo {},
 

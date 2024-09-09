@@ -29,10 +29,7 @@ pub fn instantiate(
         .transpose()?;
 
     // Save the admin. Ica address is determined during handshake. Save headstash params.
-    state::STATE.save(
-        deps.storage,
-        &ContractState::new(callback_address, msg.headstash_params),
-    )?;
+    state::STATE.save(deps.storage, &ContractState::new(callback_address))?;
 
     state::CHANNEL_OPEN_INIT_OPTIONS.save(deps.storage, &msg.channel_open_init_options)?;
 
@@ -359,7 +356,7 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{message_info, mock_dependencies, mock_env};
     use cosmwasm_std::{Api, StdError, SubMsg};
-    use state::headstash::HeadstashTokenParams;
+    // use state::headstash::HeadstashTokenParams;
 
     #[test]
     fn test_instantiate() {
@@ -376,35 +373,35 @@ mod tests {
             channel_ordering: None,
         };
 
-        let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: Some(2),
-            token_params: vec![
-                HeadstashTokenParams {
-                    native: "native1".into(),
-                    ibc: "ibc/native1".into(),
-                    symbol: "scrtNATIVE1".into(),
-                    name: "name-of-native1".into(),
-                    snip_addr: None,
-                },
-                HeadstashTokenParams {
-                    native: "native2".into(),
-                    ibc: "ibc/native2".into(),
-                    symbol: "scrtNATIVE2".into(),
-                    name: "name-of-native2".into(),
-                    snip_addr: None,
-                },
-            ],
-            headstash: None,
-            snip120u_code_id: 1u64,
-            snip120u_code_hash: "234567jkhgfdsa".into(),
-            feegranter: None,
-        };
+        // let mock_headstash_params = state::headstash::HeadstashParams {
+        //     headstash_code_id: Some(2),
+        //     token_params: vec![
+        //         HeadstashTokenParams {
+        //             native: "native1".into(),
+        //             ibc: "ibc/native1".into(),
+        //             symbol: "scrtNATIVE1".into(),
+        //             name: "name-of-native1".into(),
+        //             snip_addr: None,
+        //         },
+        //         HeadstashTokenParams {
+        //             native: "native2".into(),
+        //             ibc: "ibc/native2".into(),
+        //             symbol: "scrtNATIVE2".into(),
+        //             name: "name-of-native2".into(),
+        //             snip_addr: None,
+        //         },
+        //     ],
+        //     headstash: None,
+        //     snip120u_code_id: 1u64,
+        //     snip120u_code_hash: "234567jkhgfdsa".into(),
+        //     feegranter: None,
+        // };
 
         let msg = InstantiateMsg {
             owner: None,
             channel_open_init_options: channel_open_init_options.clone(),
             send_callbacks_to: None,
-            headstash_params: mock_headstash_params.clone(),
+            // headstash_params: mock_headstash_params.clone(),
         };
 
         let res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
@@ -458,29 +455,29 @@ mod tests {
             channel_ordering: None,
         };
 
-        let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: Some(2),
-            token_params: vec![
-                HeadstashTokenParams {
-                    native: "native1".into(),
-                    ibc: "ibc/native1".into(),
-                    symbol: "scrtNATIVE1".into(),
-                    name: "name-of-native1".into(),
-                    snip_addr: None,
-                },
-                HeadstashTokenParams {
-                    native: "native2".into(),
-                    ibc: "ibc/native2".into(),
-                    symbol: "scrtNATIVE2".into(),
-                    name: "name-of-native2".into(),
-                    snip_addr: None,
-                },
-            ],
-            headstash: None,
-            snip120u_code_id: 1u64,
-            snip120u_code_hash: "234567jkhgfdsa".into(),
-            feegranter: None,
-        };
+        // let mock_headstash_params = state::headstash::HeadstashParams {
+        //     headstash_code_id: Some(2),
+        //     token_params: vec![
+        //         HeadstashTokenParams {
+        //             native: "native1".into(),
+        //             ibc: "ibc/native1".into(),
+        //             symbol: "scrtNATIVE1".into(),
+        //             name: "name-of-native1".into(),
+        //             snip_addr: None,
+        //         },
+        //         HeadstashTokenParams {
+        //             native: "native2".into(),
+        //             ibc: "ibc/native2".into(),
+        //             symbol: "scrtNATIVE2".into(),
+        //             name: "name-of-native2".into(),
+        //             snip_addr: None,
+        //         },
+        //     ],
+        //     headstash: None,
+        //     snip120u_code_id: 1u64,
+        //     snip120u_code_hash: "234567jkhgfdsa".into(),
+        //     feegranter: None,
+        // };
 
         // Instantiate the contract
         let _res = instantiate(
@@ -491,7 +488,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                headstash_params: mock_headstash_params,
+                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -540,29 +537,30 @@ mod tests {
             counterparty_port_id: None,
             channel_ordering: None,
         };
-        let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: Some(2),
-            token_params: vec![
-                HeadstashTokenParams {
-                    native: "native1".into(),
-                    ibc: "ibc/native1".into(),
-                    symbol: "scrtNATIVE1".into(),
-                    name: "name-of-native1".into(),
-                    snip_addr: None,
-                },
-                HeadstashTokenParams {
-                    native: "native2".into(),
-                    ibc: "ibc/native2".into(),
-                    symbol: "scrtNATIVE2".into(),
-                    name: "name-of-native2".into(),
-                    snip_addr: None,
-                },
-            ],
-            headstash: None,
-            snip120u_code_id: 1u64,
-            snip120u_code_hash: "234567jkhgfdsa".into(),
-            feegranter: None,
-        };
+
+        // let mock_headstash_params = state::headstash::HeadstashParams {
+        //     headstash_code_id: Some(2),
+        //     token_params: vec![
+        //         HeadstashTokenParams {
+        //             native: "native1".into(),
+        //             ibc: "ibc/native1".into(),
+        //             symbol: "scrtNATIVE1".into(),
+        //             name: "name-of-native1".into(),
+        //             snip_addr: None,
+        //         },
+        //         HeadstashTokenParams {
+        //             native: "native2".into(),
+        //             ibc: "ibc/native2".into(),
+        //             symbol: "scrtNATIVE2".into(),
+        //             name: "name-of-native2".into(),
+        //             snip_addr: None,
+        //         },
+        //     ],
+        //     headstash: None,
+        //     snip120u_code_id: 1u64,
+        //     snip120u_code_hash: "234567jkhgfdsa".into(),
+        //     feegranter: None,
+        // };
 
         // Instantiate the contract
         let _res = instantiate(
@@ -573,7 +571,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                headstash_params: mock_headstash_params,
+                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();
@@ -620,29 +618,29 @@ mod tests {
             channel_ordering: None,
         };
 
-        let mock_headstash_params = state::headstash::HeadstashParams {
-            headstash_code_id: Some(2),
-            token_params: vec![
-                HeadstashTokenParams {
-                    native: "native1".into(),
-                    ibc: "ibc/native1".into(),
-                    symbol: "scrtNATIVE1".into(),
-                    name: "name-of-native1".into(),
-                    snip_addr: None,
-                },
-                HeadstashTokenParams {
-                    native: "native2".into(),
-                    ibc: "ibc/native2".into(),
-                    symbol: "scrtNATIVE2".into(),
-                    name: "name-of-native2".into(),
-                    snip_addr: None,
-                },
-            ],
-            headstash: None,
-            snip120u_code_id: 1u64,
-            snip120u_code_hash: "234567jkhgfdsa".into(),
-            feegranter: None,
-        };
+        // let mock_headstash_params = state::headstash::HeadstashParams {
+        //     headstash_code_id: Some(2),
+        //     token_params: vec![
+        //         HeadstashTokenParams {
+        //             native: "native1".into(),
+        //             ibc: "ibc/native1".into(),
+        //             symbol: "scrtNATIVE1".into(),
+        //             name: "name-of-native1".into(),
+        //             snip_addr: None,
+        //         },
+        //         HeadstashTokenParams {
+        //             native: "native2".into(),
+        //             ibc: "ibc/native2".into(),
+        //             symbol: "scrtNATIVE2".into(),
+        //             name: "name-of-native2".into(),
+        //             snip_addr: None,
+        //         },
+        //     ],
+        //     headstash: None,
+        //     snip120u_code_id: 1u64,
+        //     snip120u_code_hash: "234567jkhgfdsa".into(),
+        //     feegranter: None,
+        // };
 
         // Instantiate the contract
         let _res = instantiate(
@@ -653,7 +651,7 @@ mod tests {
                 owner: None,
                 channel_open_init_options,
                 send_callbacks_to: None,
-                headstash_params: mock_headstash_params,
+                // headstash_params: mock_headstash_params,
             },
         )
         .unwrap();

@@ -1,18 +1,16 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cw_ica_controller::{
-    helpers::ica_callback_execute,
-    types::{
-        msg::options::ChannelOpenInitOptions,
-        state::headstash::{HeadstashParams, HeadstashTokenParams},
-    },
+    helpers::ica_callback_execute, types::msg::options::ChannelOpenInitOptions,
 };
-use secret_headstash::state::Headstash;
+
+use crate::state::headstash::{Headstash, HeadstashParams, HeadstashTokenParams};
 
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Option<String>,
     pub ica_controller_code_id: u64,
     pub feegranter: Option<String>,
+    pub headstash_params: HeadstashParams,
 }
 
 #[ica_callback_execute]
@@ -26,8 +24,8 @@ pub enum ExecuteMsg {
     },
     /// 1. Upload the following contracts:
     /// a. Headstash
-    /// b. Snip120u 
-    /// c. Headstash Circuitboard 
+    /// b. Snip120u
+    /// c. Headstash Circuitboard
     UploadContractOnSecret {
         /// The ICA ID.
         ica_id: u64,
@@ -35,16 +33,14 @@ pub enum ExecuteMsg {
         wasm: String,
     },
     /// 2. Instantiates the secret headstash contract on Secret Network.
-    InstantiateHeadstash {
+    InitHeadstash {
         /// The ICA ID.
         ica_id: u64,
         /// Timestamp seconds of when headstash can begin
         start_date: u64,
-        /// Total token supply for each involved asset. Will be depreciated for more granular control with
-        total: headstash_cosmwasm_std::Uint128,
     },
     /// 3. Instantiate a snip120u contract for every token defined in tokens.
-    InstantiateSnip120u {
+    InitSnip120u {
         /// The ICA ID.
         ica_id: u64,
         /// Tokens to have their snip120u contract created
@@ -53,11 +49,9 @@ pub enum ExecuteMsg {
     /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
     AuthorizeMinter { ica_id: u64 },
     /// 5. Create Secret Headstash Circuitboard
-    InitScrtIcaOwner { ica_id: u64 },
+    InitHeadstashCircuitboard { ica_id: u64 },
     /// 6. Transfer each token included in msg over via ics20.
     IBCTransferTokens { ica_id: u64, channel_id: String },
-    /// 7. Create an Terp Network owned ICA account on Secret
-    CreateSecretHeadstashIcaAccount { ica_id: u64 },
     /// 8. Add Eligible Addresses To Headstash
     AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
     /// 9. Authorize secret network wallet with feegrant

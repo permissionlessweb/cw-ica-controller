@@ -4,11 +4,13 @@ use cosmwasm_std::{
     to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 // use cw2::set_contract_version;
-
 use crate::{
     error::ContractError,
     msg::{ExecuteMsg, HeadstashCallback, InstantiateMsg, QueryMsg},
-    state::{self, ContractState, CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT, ICA_STATES, STATE},
+    state::{
+        self, headstash::HeadstashTokenParams, ContractState, CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT,
+        ICA_STATES, STATE,
+    },
 };
 use cw_ica_controller::{
     headstash::commands::*,
@@ -16,11 +18,8 @@ use cw_ica_controller::{
     types::{
         callbacks::IcaControllerCallbackMsg,
         msg::{options::ChannelOpenInitOptions, ExecuteMsg as IcaControllerExecuteMsg},
-        state::headstash::HeadstashTokenParams,
-        state::{headstash::HeadstashParams, ChannelState, ChannelStatus},
     },
 };
-use headstash_cosmwasm_std::Uint128;
 
 pub const CUSTOM_CALLBACK: &str = "ica_callback_id";
 /*
@@ -43,7 +42,7 @@ pub fn instantiate(
     )?;
     STATE.save(
         deps.storage,
-        &ContractState::new(msg.ica_controller_code_id),
+        &ContractState::new(msg.ica_controller_code_id, msg.headstash_params),
     )?;
     Ok(Response::default())
 }
@@ -74,14 +73,10 @@ pub fn execute(
         ExecuteMsg::ReceiveIcaCallback(callback_msg) => {
             ica::ica_callback_handler(deps, info, callback_msg)
         }
-        ExecuteMsg::InstantiateHeadstash {
-            ica_id,
-            start_date,
-            total,
-        } => instantiate::ica_instantiate_headstash_contract(
-            deps, env, info, ica_id, start_date, total,
-        ),
-        ExecuteMsg::InstantiateSnip120u { ica_id, tokens } => {
+        ExecuteMsg::InitHeadstash { ica_id, start_date } => {
+            instantiate::ica_instantiate_headstash_contract(deps, env, info, ica_id, start_date)
+        }
+        ExecuteMsg::InitSnip120u { ica_id, tokens } => {
             instantiate::ica_instantiate_terp_network_snip120us(deps, info, ica_id, tokens)
         }
         ExecuteMsg::AuthorizeMinter { ica_id } => {
@@ -99,11 +94,8 @@ pub fn execute(
             owner,
         } => headstash::ica_authorize_feegrant(deps, info, ica_id, to_grant, owner),
         ExecuteMsg::UpdateOwnership(action) => headstash::update_ownership(deps, env, info, action),
-        ExecuteMsg::InstantiateSecretHeadstashCircuitboard { ica_id } => {
+        ExecuteMsg::InitHeadstashCircuitboard { ica_id } => {
             instantiate::ica_instantiate_headstash_circuitboard(deps, info, ica_id)
-        }
-        ExecuteMsg::CreateSecretHeadstashIcaAccount { ica_id } => {
-            headstash::create_secret_ica_contract(deps, env, info, ica_id)
         }
     }
 }
@@ -144,6 +136,8 @@ pub mod upload {
 }
 
 pub mod instantiate {
+    use headstash::ica_create_headstash_circuitboard;
+
     use crate::msg::HeadstashCallback;
 
     use super::helpers::*;
@@ -154,7 +148,6 @@ pub mod instantiate {
         info: MessageInfo,
         ica_id: u64,
         start_date: u64,
-        total_amount: Uint128,
     ) -> Result<Response, ContractError> {
         let mut msgs = vec![];
         let ica_state = ICA_STATES.load(deps.storage, ica_id)?;
@@ -174,25 +167,28 @@ pub mod instantiate {
                 }
                 let init_headstash_msg = instantiate_headstash_msg(
                     code_id,
-                    secret_headstash::msg::InstantiateMsg {
+                    crate::state::headstash::InstantiateMsg {
                         claim_msg_plaintext: "{wallet}".into(),
                         end_date: Some(env.block.time.plus_days(365u64).nanos()),
-                        snip20_1: headstash_cosmwasm_std::ContractInfo {
-                            address: headstash_cosmwasm_std::Addr::unchecked(
-                                hs.token_params[0].snip_addr.clone().unwrap(),
-                            ),
-                            code_hash: hs.snip120u_code_hash.clone(),
-                        },
-                        snip20_2: Some(headstash_cosmwasm_std::ContractInfo {
-                            address: headstash_cosmwasm_std::Addr::unchecked(
-                                hs.token_params[1].snip_addr.clone().unwrap(),
-                            ),
-                            code_hash: hs.snip120u_code_hash.clone(),
-                        }),
+                        // snip20_1: headstash_cosmwasm_std::ContractInfo {
+                        //     address: headstash_cosmwasm_std::Addr::unchecked(
+                        //         hs.token_params[0].snip_addr.clone().unwrap(),
+                        //     ),
+                        //     code_hash: hs.snip120u_code_hash.clone(),
+                        // },
+                        // snip20_2: Some(headstash_cosmwasm_std::ContractInfo {
+                        //     address: headstash_cosmwasm_std::Addr::unchecked(
+                        //         hs.token_params[1].snip_addr.clone().unwrap(),
+                        //     ),
+                        //     code_hash: hs.snip120u_code_hash.clone(),
+                        // }),
                         start_date: Some(start_date),
-                        total_amount,
                         viewing_key: "eretskeretjablret".into(),
-                        admin: headstash_cosmwasm_std::Addr::unchecked(ica.ica_addr),
+                        owner: Addr::unchecked(ica.ica_addr),
+                        snip120u_code_id: hs.snip120u_code_id.clone(),
+                        snip120u_code_hash: hs.snip120u_code_hash.clone(),
+                        snips: vec![],
+                        circuitboard: "todo!()".into(),
                     },
                 )?;
                 let msg = send_msg_as_ica(vec![init_headstash_msg], cw_ica_contract);
@@ -255,18 +251,19 @@ pub mod instantiate {
 
         let state = ICA_STATES.load(deps.storage, ica_id)?;
         let hp = state.headstash_params;
-        let msg = instantiate_secret_cw_ica_controller_msg(code_id, scrt_headstash_msg)?;
+        let cosmos_msg = ica_create_headstash_circuitboard()?;
+        let msg = send_msg_as_ica(vec![cosmos_msg], cw_ica_contract);
 
-        let msg = send_msg_as_ica(vec![msg], cw_ica_contract);
-
-        Ok(Response::new())
+        Ok(Response::new().add_message(msg))
     }
 }
 
 mod headstash {
 
-    use secret_headstash::state::Headstash;
-    use state::SNIP120U_CONTRACTS;
+    use state::{
+        headstash::{Headstash, HeadstashParams},
+        SNIP120U_CONTRACTS,
+    };
 
     use super::*;
     use crate::msg::HeadstashCallback;
@@ -288,7 +285,7 @@ mod headstash {
             owner: Some(env.contract.address.to_string()),
             channel_open_init_options,
             send_callbacks_to: Some(env.contract.address.to_string()),
-            headstash_params: headstash_params.clone(),
+            // headstash_params: headstash_params.clone(),
         };
 
         let ica_count = ICA_COUNT.load(deps.storage).unwrap_or(0);
@@ -463,7 +460,22 @@ mod headstash {
             .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::AuthorizeFeeGrants))
     }
 
-    /// Update the ownership of the contract.
+    pub fn ica_create_headstash_circuitboard() -> Result<CosmosMsg, ContractError> {
+        Ok(
+            #[allow(deprecated)]
+            CosmosMsg::Stargate {
+                type_url: "/secret.compute.v1beta1.MsgExecuteContract".into(),
+                value: anybuf::Anybuf::new()
+                    // .append_string(1, sender.to_string()) // sender (DAO)
+                    // .append_string(2, &snip120u.to_string()) // contract
+                    // .append_bytes(3, to_json_binary(&set_minter_msg)?.as_slice())
+                    .into_vec()
+                    .into(),
+            },
+        )
+    }
+
+    /// Update the ownership of this contract.
     #[allow(clippy::needless_pass_by_value)]
     pub fn update_ownership(
         deps: DepsMut,
@@ -506,9 +518,10 @@ pub mod ica {
     use anybuf::Anybuf;
     use cosmwasm_std::{from_json, Coin, Empty, IbcTimeout, Timestamp, Uint128};
     use cw_ica_controller::{
-        ibc::types::packet::acknowledgement::Data, types::state::headstash::HeadstashTokenParams,
+        ibc::types::packet::acknowledgement::Data,
+        types::state::{ChannelState, ChannelStatus},
     };
-    use secret_headstash::state::Headstash;
+    use state::headstash::Headstash;
 
     use crate::msg::HeadstashCallback;
 
@@ -630,13 +643,13 @@ pub mod ica {
         headstash: Option<String>,
         symbol: String,
     ) -> Result<CosmosMsg, ContractError> {
-        let init_msg = snip20_reference_impl::msg::InstantiateMsg {
+        let init_msg = crate::state::snip120u::InstantiateMsg {
             name: "Terp Network SNIP120U - ".to_owned() + coin.name.as_str(),
             admin: headstash,
             symbol,
             decimals: 6u8,
             initial_balances: None,
-            prng_seed: secret_cosmwasm_std::Binary(
+            prng_seed: Binary::new(
                 "eretjeretskeretjablereteretjeretskeretjableret"
                     .to_string()
                     .into_bytes(),
@@ -669,10 +682,11 @@ pub mod ica {
         headstash: String,
         snip120u: String,
     ) -> Result<CosmosMsg, ContractError> {
-        let set_minter_msg = snip20_reference_impl::msg::ExecuteMsg::AddMinters {
+        let set_minter_msg = crate::state::snip120u::AddMinters {
             minters: vec![headstash.clone()],
             padding: None,
         };
+
         Ok(
             // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
             #[allow(deprecated)]
@@ -709,7 +723,7 @@ pub mod ica {
         to_add: Vec<Headstash>,
     ) -> Result<CosmosMsg, ContractError> {
         // proto ref: https://github.com/scrtlabs/SecretNetwork/blob/master/proto/secret/compute/v1beta1/msg.proto
-        let msg = secret_headstash::msg::ExecuteMsg::Add { headstash: to_add };
+        let msg = crate::state::headstash::Add { headstash: to_add };
         Ok(
             #[allow(deprecated)]
             CosmosMsg::Stargate {
@@ -793,7 +807,7 @@ pub mod helpers {
     /// Defines the msg to instantiate the headstash contract
     pub fn instantiate_headstash_msg(
         code_id: u64,
-        scrt_headstash_msg: secret_headstash::msg::InstantiateMsg,
+        scrt_headstash_msg: crate::state::headstash::InstantiateMsg,
     ) -> Result<CosmosMsg, ContractError> {
         Ok(CosmosMsg::<Empty>::Wasm(
             cosmwasm_std::WasmMsg::Instantiate {
@@ -801,23 +815,6 @@ pub mod helpers {
                 code_id,
                 label: "Secret-Headstash Airdrop Contract: Terp Network".into(),
                 msg: to_json_binary(&scrt_headstash_msg)?,
-                funds: vec![],
-            },
-        ))
-    }
-
-    /// Defines the msg to instantiate the headstash contract.
-
-    pub fn instantiate_secret_cw_ica_controller_msg(
-        code_id: u64,
-        instantiate_msg: scrt_headstash_ica_owner::msg::InstantiateMsg,
-    ) -> Result<CosmosMsg, ContractError> {
-        Ok(CosmosMsg::<Empty>::Wasm(
-            cosmwasm_std::WasmMsg::Instantiate {
-                admin: None,
-                code_id,
-                label: "Secret-Headstash Airdrop Contract: Terp Network".into(),
-                msg: to_json_binary(&instantiate_msg)?,
                 funds: vec![],
             },
         ))
