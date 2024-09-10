@@ -26,7 +26,8 @@ pub fn instantiate(
     let callback_address = msg
         .send_callbacks_to
         .map(|addr| deps.api.addr_validate(&addr))
-        .transpose()?;
+        .transpose()
+        .unwrap_or(Some(env.contract.address.clone()));
 
     // Save the admin. Ica address is determined during handshake.
     state::STATE.save(deps.storage, &ContractState::new(callback_address))?;
@@ -78,6 +79,9 @@ pub fn execute(
             packet_memo,
             timeout_seconds,
         ),
+        ExecuteMsg::ReceiveIcaCallback(callback_msg) => {
+            execute::ica_callback_handler(deps, info, callback_msg)
+        }
         ExecuteMsg::UpdateOwnership(action) => execute::update_ownership(deps, env, info, action),
     }
 }
@@ -100,6 +104,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetContractState {} => to_json_binary(&query::state(deps)?),
         QueryMsg::GetChannel {} => to_json_binary(&query::channel(deps)?),
         QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
+        QueryMsg::GetCallbackResults {} => to_json_binary(&query::callbacks(deps)?),
     }
 }
 
@@ -120,7 +125,15 @@ pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> Result<Response, C
 mod execute {
     use cosmwasm_std::{CosmosMsg, IbcMsg, SubMsg};
 
-    use crate::{ibc::types::packet::IcaPacketData, types::msg::options::ChannelOpenInitOptions};
+    use crate::{
+        ibc::types::packet::{acknowledgement::Data, IcaPacketData},
+        types::{
+            callbacks::IcaControllerCallbackMsg,
+            msg::options::ChannelOpenInitOptions,
+            query_msg::QueryIcaCallbackResults,
+            state::{CALLBACK, CALLBACK_ERROR},
+        },
+    };
 
     use super::{
         keys, new_ica_channel_open_init_cosmos_msg, state, ContractError, DepsMut, Env,
@@ -259,6 +272,43 @@ mod execute {
 
         Ok(Response::default())
     }
+
+    /// Handles ICA controller callback messages.
+    pub fn ica_callback_handler(
+        deps: DepsMut,
+        _info: MessageInfo,
+        callback_msg: IcaControllerCallbackMsg,
+    ) -> Result<Response, ContractError> {
+        match &callback_msg {
+            IcaControllerCallbackMsg::OnChannelOpenAckCallback { .. } => Ok(Response::default()),
+            IcaControllerCallbackMsg::OnAcknowledgementPacketCallback {
+                ica_acknowledgement,
+                original_packet,
+                ..
+            } => match ica_acknowledgement {
+                Data::Result(res) => {
+                    let op = original_packet;
+
+                    CALLBACK.save(
+                        deps.storage,
+                        &vec![QueryIcaCallbackResults {
+                            og_packet: op.data.to_base64(),
+                            result: res.to_base64(),
+                        }],
+                    )?;
+                    Ok(Response::default())
+                }
+                Data::Error(res) => {
+                    let op = original_packet;
+
+                    CALLBACK_ERROR
+                        .save(deps.storage, &vec![(op.data.to_base64(), res.to_string())])?;
+                    Ok(Response::default())
+                }
+            },
+            IcaControllerCallbackMsg::OnTimeoutPacketCallback { .. } => Ok(Response::default()),
+        }
+    }
 }
 
 mod reply {
@@ -303,6 +353,12 @@ mod query {
     /// Returns the saved channel state if it exists.
     pub fn channel(deps: Deps) -> StdResult<ChannelState> {
         state::CHANNEL_STATE.load(deps.storage)
+    }
+    /// Returns the saved ibc callback state if it exists.
+    pub fn callbacks(
+        deps: Deps,
+    ) -> StdResult<Vec<crate::types::query_msg::QueryIcaCallbackResults>> {
+        state::CALLBACK.load(deps.storage)
     }
 }
 

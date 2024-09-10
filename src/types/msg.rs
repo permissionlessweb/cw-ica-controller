@@ -2,6 +2,7 @@
 //!
 //! This module defines the messages that this contract receives.
 
+use super::callbacks::IcaControllerCallbackMsg;
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::CosmosMsg;
 
@@ -68,6 +69,8 @@ pub enum ExecuteMsg {
         /// If not specified, then no callbacks are sent.
         callback_address: Option<String>,
     },
+    /// `ReceiveIcaCallback` saves ica-callbacks to state.
+    ReceiveIcaCallback(IcaControllerCallbackMsg),
 }
 
 /// The messages to query the ICA controller contract.
@@ -82,6 +85,10 @@ pub enum QueryMsg {
     /// GetContractState returns the contact's state.
     #[returns(crate::types::state::ContractState)]
     GetContractState {},
+    /// GetCallbackResults returns the contact's callback result state.
+    #[returns(Vec<crate::types::query_msg::QueryIcaCallbackResults>)]
+    GetCallbackResults {},
+
 }
 
 /// The message to migrate this contract.

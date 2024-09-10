@@ -100,6 +100,15 @@ pub mod constants {
 mod response {
     use cosmwasm_schema::cw_serde;
 
+    /// returns all ica callback results
+    #[cw_serde]
+    pub struct QueryIcaCallbackResults {
+        /// base64 encoded binary of original packet
+        pub og_packet: String,
+        /// callback result. Either base64 encoded binary of result, or string from error response.
+        pub result: String,
+    }
+
     /// The result of an ICA query packet.
     #[cw_serde]
     pub enum IcaQueryResult {

@@ -4,7 +4,9 @@ use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, IbcChannel};
 use cw_storage_plus::Item;
 
-use super::{msg::options::ChannelOpenInitOptions, ContractError};
+use super::{
+    msg::options::ChannelOpenInitOptions, query_msg::QueryIcaCallbackResults, ContractError,
+};
 
 #[allow(clippy::module_name_repetitions)]
 pub use channel::{ChannelState, ChannelStatus};
@@ -34,6 +36,13 @@ pub const ALLOW_CHANNEL_CLOSE_INIT: Item<bool> = Item::new("allow_channel_close_
 /// This is used to ensure that the correct sequence is recorded for the response.
 #[cfg(feature = "query")]
 pub const QUERY: Item<Vec<(String, bool)>> = Item::new("pending_query");
+
+/// The item used to save callbacks coming from ica tx to the contract state.
+/// it maps the original packet & the response back to state.
+pub const CALLBACK: Item<Vec<QueryIcaCallbackResults>> = Item::new("cb");
+/// The item used to save callback errors coming from ica tx to the contract state.
+/// it maps the original packet & the response back to state.
+pub const CALLBACK_ERROR: Item<Vec<(String, String)>> = Item::new("cbe");
 
 /// `PENDING_QUERIES` is the map of pending queries.
 /// It maps `channel_id`, and sequence to the query path.
