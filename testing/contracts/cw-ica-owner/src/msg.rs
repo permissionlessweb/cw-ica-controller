@@ -32,34 +32,34 @@ pub enum ExecuteMsg {
         /// The wasm blob name to upload
         wasm: String,
     },
-    /// 2. Instantiates the secret headstash contract on Secret Network.
-    InitHeadstash {
-        /// The ICA ID.
-        ica_id: u64,
-        /// Timestamp seconds of when headstash can begin
-        start_date: u64,
-    },
-    /// 3. Instantiate a snip120u contract for every token defined in tokens.
-    InitSnip120u {
-        /// The ICA ID.
-        ica_id: u64,
-        /// Tokens to have their snip120u contract created
-        tokens: Vec<HeadstashTokenParams>,
-    },
-    /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
-    AuthorizeMinter { ica_id: u64 },
-    /// 5. Create Secret Headstash Circuitboard
-    InitHeadstashCircuitboard { ica_id: u64 },
-    /// 6. Transfer each token included in msg over via ics20.
-    IBCTransferTokens { ica_id: u64, channel_id: String },
-    /// 8. Add Eligible Addresses To Headstash
-    AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
-    /// 9. Authorize secret network wallet with feegrant
-    AuthorizeFeegrant {
-        ica_id: u64,
-        to_grant: Vec<String>,
-        owner: Option<String>,
-    },
+    // /// 2. Instantiates the secret headstash contract on Secret Network.
+    // InitHeadstash {
+    //     /// The ICA ID.
+    //     ica_id: u64,
+    //     /// Timestamp seconds of when headstash can begin
+    //     start_date: u64,
+    // },
+    // /// 3. Instantiate a snip120u contract for every token defined in tokens.
+    // InitSnip120u {
+    //     /// The ICA ID.
+    //     ica_id: u64,
+    //     /// Tokens to have their snip120u contract created
+    //     tokens: Vec<HeadstashTokenParams>,
+    // },
+    // /// 4. Authorized the headstash contract as a minter for both snip120u contracts.
+    // AuthorizeMinter { ica_id: u64 },
+    // /// 5. Create Secret Headstash Circuitboard
+    // InitHeadstashCircuitboard { ica_id: u64 },
+    // /// 6. Transfer each token included in msg over via ics20.
+    // IBCTransferTokens { ica_id: u64, channel_id: String },
+    // /// 8. Add Eligible Addresses To Headstash
+    // AddHeadstashClaimers { ica_id: u64, to_add: Vec<Headstash> },
+    // /// 9. Authorize secret network wallet with feegrant
+    // AuthorizeFeegrant {
+    //     ica_id: u64,
+    //     to_grant: Vec<String>,
+    //     owner: Option<String>,
+    // },
 }
 
 #[cw_ownable::cw_ownable_query]

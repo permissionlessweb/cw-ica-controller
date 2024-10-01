@@ -73,30 +73,30 @@ pub fn execute(
         ExecuteMsg::ReceiveIcaCallback(callback_msg) => {
             ica::ica_callback_handler(deps, info, callback_msg)
         }
-        ExecuteMsg::InitHeadstash { ica_id, start_date } => {
-            instantiate::ica_instantiate_headstash_contract(deps, env, info, ica_id, start_date)
-        }
-        ExecuteMsg::InitSnip120u { ica_id, tokens } => {
-            instantiate::ica_instantiate_terp_network_snip120us(deps, info, ica_id, tokens)
-        }
-        ExecuteMsg::AuthorizeMinter { ica_id } => {
-            headstash::ica_authorize_snip120u_minter(deps, info, ica_id)
-        }
-        ExecuteMsg::IBCTransferTokens { ica_id, channel_id } => {
-            headstash::ibc_transfer_to_snip_contracts(deps, env, info, ica_id, channel_id)
-        }
-        ExecuteMsg::AddHeadstashClaimers { ica_id, to_add } => {
-            headstash::ica_add_headstash_claimers(deps, info, ica_id, to_add)
-        }
-        ExecuteMsg::AuthorizeFeegrant {
-            ica_id,
-            to_grant,
-            owner,
-        } => headstash::ica_authorize_feegrant(deps, info, ica_id, to_grant, owner),
+        // ExecuteMsg::InitHeadstash { ica_id, start_date } => {
+        //     instantiate::ica_instantiate_headstash_contract(deps, env, info, ica_id, start_date)
+        // }
+        // ExecuteMsg::InitSnip120u { ica_id, tokens } => {
+        //     instantiate::ica_instantiate_terp_network_snip120us(deps, info, ica_id, tokens)
+        // }
+        // ExecuteMsg::AuthorizeMinter { ica_id } => {
+        //     headstash::ica_authorize_snip120u_minter(deps, info, ica_id)
+        // }
+        // ExecuteMsg::IBCTransferTokens { ica_id, channel_id } => {
+        //     headstash::ibc_transfer_to_snip_contracts(deps, env, info, ica_id, channel_id)
+        // }
+        // ExecuteMsg::AddHeadstashClaimers { ica_id, to_add } => {
+        //     headstash::ica_add_headstash_claimers(deps, info, ica_id, to_add)
+        // }
+        // ExecuteMsg::AuthorizeFeegrant {
+        //     ica_id,
+        //     to_grant,
+        //     owner,
+        // } => headstash::ica_authorize_feegrant(deps, info, ica_id, to_grant, owner),
         ExecuteMsg::UpdateOwnership(action) => headstash::update_ownership(deps, env, info, action),
-        ExecuteMsg::InitHeadstashCircuitboard { ica_id } => {
-            instantiate::ica_instantiate_headstash_circuitboard(deps, info, ica_id)
-        }
+        // ExecuteMsg::InitHeadstashCircuitboard { ica_id } => {
+        //     instantiate::ica_instantiate_headstash_circuitboard(deps, info, ica_id)
+        // }
     }
 }
 
