@@ -13,7 +13,6 @@ use crate::{
     },
 };
 use cw_ica_controller::{
-    headstash::commands::*,
     helpers::{CwIcaControllerCode, CwIcaControllerContract},
     types::{
         callbacks::IcaControllerCallbackMsg,
@@ -113,6 +112,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 pub mod upload {
+
+    use crate::headstash::commands::upload_contract_msg;
 
     use super::*;
 
