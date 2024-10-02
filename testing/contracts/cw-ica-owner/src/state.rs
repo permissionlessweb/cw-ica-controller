@@ -19,6 +19,9 @@ pub const CONTRACT_ADDR_TO_ICA_ID: Map<Addr, u64> = Map::new("catia");
 /// The item used to store the stat of the snip120u contracts created
 pub const SNIP120U_CONTRACTS: Item<Vec<Addr>> = Item::new("snip");
 
+pub const CW_GLOB: Item<Addr> = Item::new("glob");
+pub const CLOCK_INTERVAL: Item<u64> = Item::new("tictoc");
+
 mod contract {
 
     use super::*;
@@ -28,7 +31,6 @@ mod contract {
     pub struct ContractState {
         /// The code ID of the cw-ica-controller contract.
         pub ica_controller_code_id: u64,
-        pub feegranter: Option<String>,
         pub headstash_params: HeadstashParams,
     }
 
@@ -37,7 +39,6 @@ mod contract {
         pub fn new(ica_controller_code_id: u64, headstash_params: HeadstashParams) -> Self {
             Self {
                 ica_controller_code_id,
-                feegranter: None,
                 headstash_params,
             }
         }
@@ -167,6 +168,8 @@ pub mod headstash {
     #[cw_serde]
     pub struct HeadstashParams {
         /// The code ID of the snip120u contract, on Secret Network.
+        pub cw_glob: String,
+        /// The code ID of the snip120u contract, on Secret Network.
         pub snip120u_code_id: u64,
         /// The code hash of the snip120u contract, on Secret Network.
         pub snip120u_code_hash: String,
@@ -179,23 +182,25 @@ pub mod headstash {
         /// and then use it to set as admin for snip120u of assets after 1st callback.
         pub headstash: Option<String>,
         /// The wallet address able to create feegrant authorizations on behalf of this contract
-        pub feegranter: Option<String>,
+        pub fee_granter: Option<String>,
     }
 
     impl HeadstashParams {
         /// creates new headstash param instance
         pub fn new(
+            cw_glob: String,
             snip120u_code_id: u64,
             snip120u_code_hash: String,
             token_params: Vec<HeadstashTokenParams>,
         ) -> Self {
             Self {
+                cw_glob,
                 snip120u_code_id,
                 snip120u_code_hash,
                 headstash_code_id: None,
                 token_params,
                 headstash: None,
-                feegranter: None,
+                fee_granter: None,
             }
         }
     }

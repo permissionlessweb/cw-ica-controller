@@ -16,6 +16,9 @@ pub enum ContractError {
     #[error("error : {0}")]
     CwIcaControllerError(#[from] CwIcaControllerError),
 
+    #[error("SubMsgError")]
+    SubMsgError {},
+    
     #[error("no coin sent matches the expected coins to be sent")]
     NoCoinSentMatchesHeadstashParams {},
 
@@ -60,4 +63,10 @@ pub enum ContractError {
 
     #[error("unauthorized")]
     Unauthorized {},
+
+    #[error("InvalidAttribute")]
+    InvalidAttribute {},
+
+    #[error("InvalidEvent")]
+    InvalidEvent {},
 }

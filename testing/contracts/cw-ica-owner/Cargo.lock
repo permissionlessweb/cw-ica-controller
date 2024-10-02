@@ -650,6 +650,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cw-glob"
+version = "0.1.0"
+dependencies = [
+ "anybuf",
+ "cosmwasm-schema 2.1.3",
+ "cosmwasm-std 2.1.3",
+ "cw-ownable",
+ "cw-storage-plus 2.0.0",
+ "cw2 2.0.0",
+ "schemars",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "cw-ica-controller"
 version = "0.20.0"
 dependencies = [
@@ -1236,6 +1251,7 @@ dependencies = [
  "anybuf",
  "cosmwasm-schema 2.1.3",
  "cosmwasm-std 2.1.3",
+ "cw-glob",
  "cw-ica-controller",
  "cw-ownable",
  "cw-storage-plus 2.0.0",

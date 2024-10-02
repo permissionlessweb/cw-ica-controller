@@ -8,8 +8,8 @@ use crate::state::headstash::{Headstash, HeadstashParams, HeadstashTokenParams};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub owner: Option<String>,
-    pub ica_controller_code_id: u64,
     pub feegranter: Option<String>,
+    pub ica_controller_code_id: u64,
     pub headstash_params: HeadstashParams,
 }
 
@@ -61,6 +61,10 @@ pub enum ExecuteMsg {
     //     owner: Option<String>,
     // },
 }
+#[cw_serde]
+pub enum SudoMsg {
+    HandleIbcBloom {}
+}
 
 #[cw_ownable::cw_ownable_query]
 #[cw_serde]
@@ -75,11 +79,6 @@ pub enum QueryMsg {
     /// GetIcaCount returns the number of ICAs.
     #[returns(u64)]
     GetIcaCount {},
-}
-
-pub struct SNIP120UInitParams {
-    pub ibc_hash: String,
-    pub native: String,
 }
 
 #[cw_serde]

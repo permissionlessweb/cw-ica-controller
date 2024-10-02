@@ -1,15 +1,17 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    from_base64, to_json_binary, Addr, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply,
+    Response, StdResult,
 };
 // use cw2::set_contract_version;
 use crate::{
     error::ContractError,
-    msg::{ExecuteMsg, HeadstashCallback, InstantiateMsg, QueryMsg},
+    headstash::commands::upload_contract_msg,
+    msg::{ExecuteMsg, HeadstashCallback, InstantiateMsg, QueryMsg, SudoMsg},
     state::{
-        self, headstash::HeadstashTokenParams, ContractState, CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT,
-        ICA_STATES, STATE,
+        self, headstash::HeadstashTokenParams, ContractState, CLOCK_INTERVAL,
+        CONTRACT_ADDR_TO_ICA_ID, ICA_COUNT, ICA_STATES, STATE,
     },
 };
 use cw_ica_controller::{
@@ -111,9 +113,89 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     }
 }
 
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, ContractError> {
+    match reply.result {
+        cosmwasm_std::SubMsgResult::Ok(res) => match reply.id {
+            710u64 => {
+                // Extract the event attributes
+                let event = res.events.iter().find(|e| e.ty == "headstash");
+                if let Some(event) = event {
+                    let ica_upload_msg =
+                        event.attributes.iter().find(|a| a.key == "ica-upload-msg");
+                    let sender = event.attributes.iter().find(|a| a.key == "sender");
+                    let owner = event.attributes.iter().find(|a| a.key == "owner");
+                    let ica_id = event.attributes.iter().find(|a| a.key == "ica-id");
+
+                    if let (Some(ica_upload_msg), Some(sender), Some(owner), Some(ica_id)) =
+                        (ica_upload_msg, sender, owner, ica_id)
+                    {
+                        // Decode the base64 encoded wasm blob
+                        let decoded_wasm = from_base64(ica_upload_msg.value.as_str())?;
+                        // let wasm_blob = Binary(decoded_wasm);
+
+                        let upload_msg = upload_contract_msg(
+                            deps.api.addr_validate(&sender.value.clone())?,
+                            decoded_wasm,
+                        )?;
+
+                        // bypass ownership check, this was done already.
+                        let cw_ica_account =
+                            CwIcaControllerContract::new(Addr::unchecked(sender.value.clone()));
+
+                        // send msg with wasm from glob as ica
+                        let msg = helpers::send_msg_as_ica(vec![upload_msg], cw_ica_account);
+
+                        return Ok(Response::new().add_message(msg));
+                    } else {
+                        return Err(ContractError::InvalidAttribute {});
+                    }
+                } else {
+                    return Err(ContractError::InvalidEvent {});
+                }
+            }
+            _ => return Err(ContractError::Unauthorized {}),
+        },
+        cosmwasm_std::SubMsgResult::Err(_) => return Err(ContractError::SubMsgError {}),
+    }
+}
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
+    match msg {
+        SudoMsg::HandleIbcBloom {} => {
+            // If the block is not divisible by ten, do nothing.
+            if env.block.height % CLOCK_INTERVAL.load(deps.storage)? != 0 {
+                // Send msg to process ibc-blooms
+
+                // expect callback with new interval
+                return Ok(Response::new());
+            }
+        }
+    }
+
+    Ok(Response::new())
+}
+
 pub mod upload {
 
-    use crate::headstash::commands::upload_contract_msg;
+    use cosmwasm_std::{SubMsg, WasmMsg};
+    use state::CW_GLOB;
+
+    use crate::{headstash::commands::upload_contract_msg, msg};
+
+    pub fn into_cosmos_msg(
+        contract_addr: String,
+        msg: impl Into<msg::ExecuteMsg>,
+    ) -> StdResult<CosmosMsg> {
+        let msg = to_json_binary(&msg.into())?;
+        Ok(WasmMsg::Execute {
+            contract_addr,
+            msg,
+            funds: vec![],
+        }
+        .into())
+    }
 
     use super::*;
 
@@ -127,11 +209,19 @@ pub mod upload {
         let cw_ica_contract =
             helpers::retrieve_ica_owner_account(deps.as_ref(), info.sender.clone(), ica_id)?;
 
-        let upload_msg = upload_contract_msg(info.sender, &contract)?;
-        let msg = helpers::send_msg_as_ica(vec![upload_msg], cw_ica_contract);
+        // msg to grab wasm blob from cw_glob
+        let msg = cw_glob::msg::ExecuteMsg::TakeGlob {
+            sender: cw_ica_contract.addr().to_string(),
+            key: contract,
+            id: ica_id,
+        };
 
+        // grab the msg to upload wasm via ica-controller from cw-glob
+        let upload_msg = helpers::cw_goop_execute(CW_GLOB.load(deps.storage)?.to_string(), msg)?;
+
+        // send as submsg to handle reply
         Ok(Response::default()
-            .add_message(msg)
+            .add_submessage(SubMsg::reply_always(upload_msg, 710))
             .add_attribute(CUSTOM_CALLBACK, HeadstashCallback::UploadHeadstash))
     }
 }
@@ -423,11 +513,11 @@ mod headstash {
         owner: Option<String>,
     ) -> Result<Response, ContractError> {
         let mut msgs = vec![];
-        let state = STATE.load(deps.storage)?;
+        let feegranter = STATE.load(deps.storage)?.headstash_params.fee_granter;
         // fee granter may also call this entry point.
         let cw_ica_contract = match owner {
             Some(a) => {
-                if let Some(b) = state.feegranter {
+                if let Some(b) = feegranter {
                     if info.sender.to_string() != b {
                         return Err(ContractError::NotValidFeegranter {});
                     }
@@ -819,6 +909,17 @@ pub mod helpers {
                 funds: vec![],
             },
         ))
+    }
+    /// Defines the msg to instantiate the headstash contract
+    pub fn cw_goop_execute(
+        cw_glob: String,
+        msg: cw_glob::msg::ExecuteMsg,
+    ) -> Result<CosmosMsg, ContractError> {
+        Ok(CosmosMsg::<Empty>::Wasm(cosmwasm_std::WasmMsg::Execute {
+            contract_addr: cw_glob,
+            msg: to_json_binary(&msg)?,
+            funds: vec![],
+        }))
     }
 }
 
