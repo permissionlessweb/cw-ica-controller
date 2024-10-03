@@ -101,6 +101,9 @@ pub mod headstash {
     use crate::ContractError;
 
     #[cw_serde]
+    pub struct HandleIbcBloom {}
+
+    #[cw_serde]
     pub struct Snip120u {
         pub token: String,
         pub name: String,

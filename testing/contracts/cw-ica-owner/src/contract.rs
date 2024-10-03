@@ -164,9 +164,10 @@ pub fn reply(deps: DepsMut, _env: Env, reply: Reply) -> Result<Response, Contrac
 pub fn sudo(deps: DepsMut, env: Env, msg: SudoMsg) -> Result<Response, ContractError> {
     match msg {
         SudoMsg::HandleIbcBloom {} => {
-            // If the block is not divisible by ten, do nothing.
             if env.block.height % CLOCK_INTERVAL.load(deps.storage)? != 0 {
                 // Send msg to process ibc-blooms
+                // get default ica account to call 
+                // call contract as ica to handleBloom
 
                 // expect callback with new interval
                 return Ok(Response::new());
