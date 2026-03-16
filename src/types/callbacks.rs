@@ -20,9 +20,11 @@ use crate::ibc::types::{
     ::std::fmt::Debug,
     ::std::cmp::PartialEq,
     ::cosmwasm_schema::schemars::JsonSchema,
+    ::cosmwasm_schema::cw_schema::Schemaifier,
 )]
 #[serde(rename_all = "snake_case", crate = "::cosmwasm_schema::serde")]
 #[schemars(crate = "::cosmwasm_schema::schemars")]
+#[schemaifier(crate = "::cosmwasm_schema::cw_schema")]
 pub enum IcaControllerCallbackMsg {
     /// `OnAcknowledgementPacketCallback` is the callback that this contract makes to other contracts
     /// when it receives an acknowledgement packet.

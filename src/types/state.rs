@@ -50,8 +50,9 @@ mod contract {
     use super::{cw_serde, Addr, ContractError};
 
     /// State is the state of the contract.
-    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+    #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, JsonSchema, cosmwasm_schema::cw_schema::Schemaifier)]
     #[allow(clippy::derive_partial_eq_without_eq)]
+    #[schemaifier(crate = "::cosmwasm_schema::cw_schema")]
     pub struct State {
         /// The Interchain Account (ICA) info needed to send packets.
         /// This is set during the handshake.
