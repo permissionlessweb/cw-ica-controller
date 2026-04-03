@@ -46,15 +46,15 @@ cosmwasm-std = { version = "3.0.1", features = [
     "stargate",
 ] }
 cw-storage-plus = "3.0.0"
-cw2 = "3.0.0"
+cw2 = { path = "../cw-minus/packages/cw2" }
 schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"
 thiserror = "1.0"
-cosmos-sdk-proto = { version = "0.23", default-features = false, features = ["cosmwasm", "std"] }
-ibc-proto = { version = "0.47", default-features = false, features = ["std", "serde"] }
+cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
+ibc-proto = { path = "../ibc-proto-rs" }
 semver = "1.0"
-cw-ownable = { version = "3.0.1", git = "https://github.com/permissionlessweb/cw-plus-plus" }
+cw-ownable = { path = "../cw-plus-plus/packages/ownable" }
 cw-ica-controller-derive = "0.4.2"
 prost = { version = "0.13", optional = true }
 anybuf = "0.5"
