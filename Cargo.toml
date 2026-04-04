@@ -54,7 +54,7 @@ thiserror = "1.0"
 cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main", features = ["cosmwasm"] }
 ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "main" }
 semver = "1.0"
-cw-ownable = { git = "https://github.com/permissionlessweb/cw-plus-plus", branch = "main" }
+cw-ownable = { git = "https://github.com/permissionlessweb/cw-plus-plus", branch = "feat/mvp" }
 cw-ica-controller-derive = "0.4.2"
 prost = { version = "0.14", optional = true }
 anybuf = "0.5"
