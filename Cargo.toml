@@ -40,21 +40,21 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-cosmwasm-schema = "3.0.1"
-cosmwasm-std = { version = "3.0.1", features = [
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp" }
+cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "mvp", features = ["cosmwasm_3_0", "stargate"] }
     "cosmwasm_3_0",
     "stargate",
 ] }
-cw-storage-plus = "3.0.0"
-cw2 = { path = "../cw-minus/packages/cw2" }
+cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "mvp" }
+cw2 = { git = "https://github.com/permissionlessweb/cw-minus", branch = "main" }
 schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"
 thiserror = "1.0"
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto", features = ["cosmwasm"] }
-ibc-proto = { path = "../ibc-proto-rs" }
+cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "main", features = ["cosmwasm"] }
+ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "main" }
 semver = "1.0"
-cw-ownable = { path = "../cw-plus-plus/packages/ownable" }
+cw-ownable = { git = "https://github.com/permissionlessweb/cw-plus-plus", branch = "main" }
 cw-ica-controller-derive = "0.4.2"
 prost = { version = "0.14", optional = true }
 anybuf = "0.5"
