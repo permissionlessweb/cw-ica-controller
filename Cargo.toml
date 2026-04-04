@@ -51,12 +51,12 @@ schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"
 thiserror = "1.0"
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto" }
+cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto", features = ["cosmwasm"] }
 ibc-proto = { path = "../ibc-proto-rs" }
 semver = "1.0"
 cw-ownable = { path = "../cw-plus-plus/packages/ownable" }
 cw-ica-controller-derive = "0.4.2"
-prost = { version = "0.13", optional = true }
+prost = { version = "0.14", optional = true }
 anybuf = "0.5"
 serde_with = "3.8"
 
