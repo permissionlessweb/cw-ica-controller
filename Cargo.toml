@@ -1,3 +1,6 @@
+[workspace]
+exclude = ["testing/contracts"]
+
 [package]
 name = "cw-ica-controller"
 version = "0.20.0"
