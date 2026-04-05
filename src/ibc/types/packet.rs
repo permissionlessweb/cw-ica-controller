@@ -5,7 +5,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_json_binary, CosmosMsg, Env, IbcMsg, IbcTimeout, StdError, StdResult};
 
-pub use cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx;
+pub use ibc_proto::ibc::applications::interchain_accounts::v1::CosmosTx;
 use cosmos_sdk_proto::traits::Message;
 
 use crate::types::cosmos_msg::convert_to_proto_any;
@@ -22,7 +22,7 @@ pub const DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 /// This contract only supports the protobuf encoding.
 ///
 /// When protobuf is used, then the raw transaction must encoded using
-/// [`CosmosTx`](cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx).
+/// [`CosmosTx`](ibc_proto::ibc::applications::interchain_accounts::v1::CosmosTx).
 #[allow(clippy::module_name_repetitions)]
 #[cw_serde]
 pub struct IcaPacketData {

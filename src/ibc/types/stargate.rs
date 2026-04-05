@@ -7,7 +7,7 @@
 pub mod channel {
     use cosmwasm_std::{CosmosMsg, IbcOrder};
 
-    use cosmos_sdk_proto::ibc::core::channel::v1::{
+    use ibc_proto::ibc::core::channel::v1::{
         Channel, Counterparty, MsgChannelOpenInit, Order, State,
     };
     use cosmos_sdk_proto::traits::Message;
