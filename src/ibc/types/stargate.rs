@@ -84,6 +84,7 @@ pub mod channel {
                 }),
                 connection_hops: vec![connection_id.into()],
                 version: version.into(),
+                upgrade_sequence: 0,
             }),
             signer: signer.into(),
         }
