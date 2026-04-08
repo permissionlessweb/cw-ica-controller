@@ -587,7 +587,7 @@ dependencies = [
 [[package]]
 name = "cw-utils"
 version = "3.0.0"
-source = "git+https://github.com/permissionlessweb/cw-minus?branch=main#3dcc39ed9c9199b08fff90b9e4a57b464ccc855f"
+source = "git+https://github.com/permissionlessweb/cw-minus?branch=main#54e7f82f24278a41f29e8f10aa5069ac775e9b99"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -599,7 +599,7 @@ dependencies = [
 [[package]]
 name = "cw2"
 version = "3.0.0"
-source = "git+https://github.com/permissionlessweb/cw-minus?branch=main#3dcc39ed9c9199b08fff90b9e4a57b464ccc855f"
+source = "git+https://github.com/permissionlessweb/cw-minus?branch=main#54e7f82f24278a41f29e8f10aa5069ac775e9b99"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
