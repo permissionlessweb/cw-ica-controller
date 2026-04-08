@@ -25,11 +25,11 @@ overflow-checks = true
 library = []
 
 [dependencies]
-cosmwasm-schema = { path = "../../../../ZK/cw/zk-cosmwasm/packages/schema" }
-cosmwasm-std = { path = "../../../../ZK/cw/zk-cosmwasm/packages/std", features = ["cosmwasm_1_4"] }
-cw-storage-plus = { path = "../../../../ZK/cw/zk-storage-plus" }
-cw2 = { path = "../../../../ZK/cw/zk-cw-minus/packages/cw2" }
-cw-ica-controller = { path = "../../..", default-features = false }
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
+cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp", features = ["cosmwasm_1_4"] }
+cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "zk-mvp" }
+cw2 = { git = "https://github.com/permissionlessweb/cw-minus", branch = "zk-mvp" }
+cw-ica-controller = { git = "https://github.com/permissionlessweb/cw-ica-controller", branch = "zk-mvp", default-features = false }
 schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"

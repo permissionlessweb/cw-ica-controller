@@ -43,18 +43,18 @@ optimize = """docker run --rm -v "$(pwd)":/code \
 """
 
 [dependencies]
-cosmwasm-schema = { path = "../ZK/cw/zk-cosmwasm/packages/schema" }
-cosmwasm-std = { path = "../ZK/cw/zk-cosmwasm/packages/std", features = ["cosmwasm_3_0", "stargate"] }
-cw-storage-plus = { path = "../ZK/cw/zk-storage-plus" }
-cw2 = { path = "../ZK/cw/zk-cw-minus/packages/cw2" }
+cosmwasm-schema = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp" }
+cosmwasm-std = { git = "https://github.com/permissionlessweb/cosmwasm", branch = "zk-mvp", features = ["cosmwasm_3_0", "stargate"] }
+cw-storage-plus = { git = "https://github.com/permissionlessweb/cw-storage-plus", branch = "zk-mvp" }
+cw2 = { git = "https://github.com/permissionlessweb/cw-minus", branch = "zk-mvp" }
 schemars = "0.8"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-json-wasm = "1.0"
 thiserror = "1.0"
-cosmos-sdk-proto = { path = "../cosmos-rust/cosmos-sdk-proto", features = ["cosmwasm"] }
-ibc-proto = { path = "../ibc-proto-rs" }
+cosmos-sdk-proto = { git = "https://github.com/permissionlessweb/cosmos-rust", branch = "zk-mvp", features = ["cosmwasm"] }
+ibc-proto = { git = "https://github.com/permissionlessweb/ibc-proto-rs", branch = "zk-mvp" }
 semver = "1.0"
-cw-ownable = { path = "../ZK/cw/zk-plus-plus/packages/ownable" }
+cw-ownable = { git = "https://github.com/permissionlessweb/cw-plus-plus", branch = "zk-mvp" }
 cw-ica-controller-derive = "0.4.2"
 prost = { version = "0.14", optional = true }
 anybuf = "0.5"
