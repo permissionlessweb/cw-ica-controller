@@ -5,7 +5,7 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{to_json_binary, CosmosMsg, Env, IbcMsg, IbcTimeout, StdError, StdResult};
 
-pub use cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx;
+pub use ibc_proto::ibc::applications::interchain_accounts::v1::CosmosTx;
 use cosmos_sdk_proto::traits::Message;
 
 use crate::types::cosmos_msg::convert_to_proto_any;
@@ -16,12 +16,13 @@ use super::metadata::TxEncoding;
 pub const DEFAULT_TIMEOUT_SECONDS: u64 = 600;
 
 /// `IcaPacketData` is comprised of a raw transaction, type of transaction and optional memo field.
+///
 /// Currently, the host only supports [protobuf](super::metadata::TxEncoding::Protobuf) or
 /// [proto3json](super::metadata::TxEncoding::Proto3Json) serialized Cosmos transactions.
 /// This contract only supports the protobuf encoding.
 ///
 /// When protobuf is used, then the raw transaction must encoded using
-/// [`CosmosTx`](cosmos_sdk_proto::ibc::applications::interchain_accounts::v1::CosmosTx).
+/// [`CosmosTx`](ibc_proto::ibc::applications::interchain_accounts::v1::CosmosTx).
 #[allow(clippy::module_name_repetitions)]
 #[cw_serde]
 pub struct IcaPacketData {
@@ -47,7 +48,7 @@ pub struct IcaPacketData {
 impl IcaPacketData {
     /// Creates a new [`IcaPacketData`]
     #[must_use]
-    pub fn new(data: Vec<u8>, memo: Option<String>) -> Self {
+    pub const fn new(data: Vec<u8>, memo: Option<String>) -> Self {
         Self {
             r#type: 1,
             data,
@@ -92,7 +93,7 @@ impl IcaPacketData {
                     .into_iter()
                     .map(|msg| -> StdResult<cosmos_sdk_proto::Any> {
                         convert_to_proto_any(msg, ica_address.to_string())
-                            .map_err(|e| StdError::generic_err(e.to_string()))
+                            .map_err(|e| StdError::msg(e.to_string()))
                     })
                     .collect::<StdResult<Vec<cosmos_sdk_proto::Any>>>()?;
 
@@ -120,13 +121,13 @@ impl IcaPacketData {
                     };
 
                     proto_anys.push(cosmos_sdk_proto::Any::from_msg(&query_msg).map_err(|e| {
-                        StdError::generic_err(format!("failed to convert query msg: {e}"))
+                        StdError::msg(format!("failed to convert query msg: {e}"))
                     })?);
                 }
 
                 Ok(Self::from_proto_anys(proto_anys, memo))
             }
-            TxEncoding::Proto3Json => StdResult::Err(StdError::generic_err(
+            TxEncoding::Proto3Json => StdResult::Err(StdError::msg(
                 "unsupported encoding: proto3json".to_string(),
             )),
         }
@@ -157,13 +158,13 @@ impl IcaPacketData {
                     .into_iter()
                     .map(|msg| -> StdResult<cosmos_sdk_proto::Any> {
                         convert_to_proto_any(msg, ica_address.to_string())
-                            .map_err(|e| StdError::generic_err(e.to_string()))
+                            .map_err(|e| StdError::msg(e.to_string()))
                     })
                     .collect::<StdResult<Vec<cosmos_sdk_proto::Any>>>()?;
 
                 Ok(Self::from_proto_anys(proto_anys, memo))
             }
-            TxEncoding::Proto3Json => StdResult::Err(StdError::generic_err(
+            TxEncoding::Proto3Json => StdResult::Err(StdError::msg(
                 "unsupported encoding: proto3json".to_string(),
             )),
         }
@@ -224,7 +225,7 @@ pub mod acknowledgement {
         pub fn to_tx_msg_data(&self) -> Result<TxMsgData, ContractError> {
             match self {
                 Self::Result(data) => Ok(TxMsgData::decode(data.as_slice())?),
-                Self::Error(err) => Err(StdError::generic_err(err))?,
+                Self::Error(err) => Err(StdError::msg(err))?,
             }
         }
 
@@ -239,7 +240,7 @@ pub mod acknowledgement {
         ) -> Result<query_msg::proto::MsgModuleQuerySafeResponse, ContractError> {
             let tx_msg_data = self.to_tx_msg_data()?;
             let msg_resp = tx_msg_data.msg_responses.get(index).ok_or_else(|| {
-                StdError::generic_err("no MsgData found at the given index".to_string())
+                StdError::msg("no MsgData found at the given index".to_string())
             })?;
 
             Ok(query_msg::proto::MsgModuleQuerySafeResponse::decode(
@@ -258,7 +259,7 @@ pub mod acknowledgement {
         ) -> Result<query_msg::proto::MsgModuleQuerySafeResponse, ContractError> {
             let tx_msg_data = self.to_tx_msg_data()?;
             let msg_resp = tx_msg_data.msg_responses.last().ok_or_else(|| {
-                StdError::generic_err("no MsgData found at the given index".to_string())
+                StdError::msg("no MsgData found at the given index".to_string())
             })?;
 
             Ok(query_msg::proto::MsgModuleQuerySafeResponse::decode(

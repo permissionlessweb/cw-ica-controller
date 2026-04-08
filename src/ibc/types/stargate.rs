@@ -7,7 +7,7 @@
 pub mod channel {
     use cosmwasm_std::{CosmosMsg, IbcOrder};
 
-    use cosmos_sdk_proto::ibc::core::channel::v1::{
+    use ibc_proto::ibc::core::channel::v1::{
         Channel, Counterparty, MsgChannelOpenInit, Order, State,
     };
     use cosmos_sdk_proto::traits::Message;
@@ -15,6 +15,7 @@ pub mod channel {
     use super::super::{keys, metadata};
 
     /// Creates a new [`MsgChannelOpenInit`] for an ica channel with the given contract address.
+    ///
     /// Also generates the handshake version.
     /// If the counterparty port id is not provided, [`keys::HOST_PORT_ID`] is used.
     /// If the tx encoding is not provided, [`metadata::TxEncoding::Protobuf`] is used.
@@ -83,6 +84,7 @@ pub mod channel {
                 }),
                 connection_hops: vec![connection_id.into()],
                 version: version.into(),
+                upgrade_sequence: 0,
             }),
             signer: signer.into(),
         }

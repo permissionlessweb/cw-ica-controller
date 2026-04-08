@@ -152,12 +152,19 @@ mod response {
         Supply(cosmwasm_std::SupplyResponse),
         /// Response for the [`cosmwasm_std::BankQuery::Balance`] query.
         Balance(cosmwasm_std::BalanceResponse),
-        /// Response for the [`cosmwasm_std::BankQuery::AllBalances`] query.
-        AllBalances(cosmwasm_std::AllBalanceResponse),
+        /// Response for the all balances query (removed as a direct BankQuery variant in v3).
+        AllBalances(AllBalancesResponseCompat),
         /// Response for the [`cosmwasm_std::BankQuery::DenomMetadata`] query.
         DenomMetadata(cosmwasm_std::DenomMetadataResponse),
         /// Response for the [`cosmwasm_std::BankQuery::AllDenomMetadata`] query.
         AllDenomMetadata(cosmwasm_std::AllDenomMetadataResponse),
+    }
+
+    /// Compatibility type for AllBalances response (removed from cosmwasm_std in v3).
+    #[cw_serde]
+    pub struct AllBalancesResponseCompat {
+        /// The balances.
+        pub amount: Vec<cosmwasm_std::Coin>,
     }
 
     /// The response type for the [`cosmwasm_std::WasmQuery`] queries.
@@ -223,7 +230,7 @@ mod convert_to_protobuf {
     use cosmos_sdk_proto::{
         cosmos::{
             bank::v1beta1::{
-                QueryAllBalancesRequest, QueryBalanceRequest, QueryDenomMetadataRequest,
+                QueryBalanceRequest, QueryDenomMetadataRequest,
                 QueryDenomsMetadataRequest, QuerySupplyOfRequest,
             },
             base::query::v1beta1::PageRequest,
@@ -243,15 +250,6 @@ mod convert_to_protobuf {
             BankQuery::Balance { address, denom } => (
                 constants::BALANCE.to_string(),
                 QueryBalanceRequest { address, denom }.encode_to_vec(),
-                false,
-            ),
-            BankQuery::AllBalances { address } => (
-                constants::ALL_BALANCES.to_string(),
-                QueryAllBalancesRequest {
-                    address,
-                    pagination: None,
-                }
-                .encode_to_vec(),
                 false,
             ),
             BankQuery::DenomMetadata { denom } => (
@@ -397,15 +395,15 @@ pub mod from_protobuf {
         prost::Message,
     };
     use cosmwasm_std::{
-        AllBalanceResponse, AllDenomMetadataResponse, BalanceResponse, Binary, Coin,
+        AllDenomMetadataResponse, BalanceResponse, Binary, Coin,
         ContractInfoResponse, DenomMetadata, DenomMetadataResponse, DenomUnit, StdResult,
-        SupplyResponse, Uint128,
+        SupplyResponse, Uint256,
     };
 
     fn convert_to_coin(coin: ProtoCoin) -> StdResult<Coin> {
         Ok(Coin {
             denom: coin.denom,
-            amount: Uint128::from_str(&coin.amount)?,
+            amount: Uint256::from_str(&coin.amount)?,
         })
     }
 
@@ -428,6 +426,26 @@ pub mod from_protobuf {
                 })
                 .collect(),
         }
+    }
+
+    #[cfg(feature = "staking")]
+    fn convert_to_validator_metadata(
+        validator: cosmos_sdk_proto::cosmos::staking::v1beta1::Validator,
+    ) -> StdResult<cosmwasm_std::ValidatorMetadata> {
+        use cosmwasm_std::Decimal;
+
+        let commission_rates = validator
+            .commission
+            .unwrap_or_default()
+            .commission_rates
+            .unwrap_or_default();
+
+        Ok(cosmwasm_std::ValidatorMetadata::new(
+            validator.operator_address,
+            Decimal::from_str(&commission_rates.rate)?,
+            Decimal::from_str(&commission_rates.max_rate)?,
+            Decimal::from_str(&commission_rates.max_change_rate)?,
+        ))
     }
 
     #[cfg(feature = "staking")]
@@ -489,12 +507,12 @@ pub mod from_protobuf {
             constants::ALL_BALANCES => {
                 let resp = QueryAllBalancesResponse::decode(resp)?;
                 Ok(IcaQueryResponse::Bank(BankQueryResponse::AllBalances(
-                    AllBalanceResponse::new(
-                        resp.balances
+                    super::AllBalancesResponseCompat {
+                        amount: resp.balances
                             .into_iter()
                             .map(convert_to_coin)
                             .collect::<StdResult<_>>()?,
-                    ),
+                    },
                 )))
             }
             constants::DENOM_METADATA => {
@@ -550,8 +568,9 @@ pub mod from_protobuf {
                             if info.ibc_port_id.is_empty() {
                                 None
                             } else {
-                                Some(info.ibc_port_id)
+                                Some(info.ibc_port_id.clone())
                             },
+                            None, // ibc2_port
                         )
                     }),
                 )))
@@ -601,7 +620,7 @@ pub mod from_protobuf {
                     StakingQueryResponse::AllValidators(AllValidatorsResponse::new(
                         resp.validators
                             .into_iter()
-                            .map(convert_to_validator)
+                            .map(convert_to_validator_metadata)
                             .collect::<StdResult<_>>()?,
                     )),
                 ))

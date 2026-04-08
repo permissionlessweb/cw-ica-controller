@@ -253,6 +253,7 @@ mod convert_to_any {
                     metadata: String::new(),
                 })
             }
+            _ => panic!("Unsupported GovMsg"),
         }
     }
 

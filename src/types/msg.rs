@@ -107,9 +107,11 @@ pub mod options {
         Debug,
         PartialEq,
         cosmwasm_schema::schemars::JsonSchema,
+        cosmwasm_schema::cw_schema::Schemaifier,
     )]
     #[allow(clippy::derive_partial_eq_without_eq)]
     #[schemars(crate = "::cosmwasm_schema::schemars")]
+    #[schemaifier(crate = "::cosmwasm_schema::cw_schema")]
     pub struct ChannelOpenInitOptions {
         /// The connection id on this chain.
         pub connection_id: String,

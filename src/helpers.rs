@@ -170,7 +170,7 @@ impl CwIcaControllerCode {
                 &creator_cannonical,
                 salt.as_bytes(),
             )
-            .map_err(|e| StdError::generic_err(e.to_string()))?,
+            .map_err(|e| StdError::msg(e.to_string()))?,
         )?;
 
         let instantiate_msg = WasmMsg::Instantiate2 {
